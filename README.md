@@ -4,6 +4,8 @@
 
 A proof of concept for the SD Worx hackathon challenge *Unlock the Knowledge Within: Find it. Understand it. Trust it.*
 
+**Live demo:** https://knowledgetree-99869633039.europe-west1.run.app (pick any account on the login page, for example Lena Vermeulen)
+
 ![Search](docs/screenshots/03-search-result.png)
 
 ## The problem we picked
