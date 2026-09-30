@@ -89,7 +89,7 @@ export function NodePanel({ data }: { data: PanelData }) {
             )}
             {adding === "file" && <UploadForm nodeId={data.node.id} country={data.viewCountry} categories={data.categories} defaultCategory={defaultCategory} onDone={() => setAdding(null)} />}
 
-            <Section icon={Building2} title="SD Worx documents" hint="Created and maintained by SD Worx" count={ours.length}>
+            <Section icon={Building2} title="SDWorx documents" hint="Created and maintained by SDWorx" count={ours.length}>
               {ours.map((i) => <ItemCard key={i.id} item={i} highlight={data.highlightItem === i.id} me={data.currentUserId} categories={data.categories} />)}
             </Section>
             <Section icon={ArrowDownLeft} title="Received from customer" hint="Documents the customer gave us, kept as received" count={theirs.length} tone="customer">
@@ -114,7 +114,7 @@ export function NodePanel({ data }: { data: PanelData }) {
         {tab === "people" && (
           <div className="space-y-5">
             <div>
-              <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-sd-muted">SD Worx experts for this entity</h3>
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-sd-muted">SDWorx experts for this entity</h3>
               <ul className="mt-3 space-y-2">
                 {data.experts.map((p) => (
                   <li key={p.id} className="flex items-center gap-3 rounded-[8px] border border-sd-border p-3">
@@ -205,7 +205,7 @@ function ItemCard({ item, highlight, me, categories }: { item: PanelItem; highli
           )}
           <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-[11.5px]">
             <div className="text-sd-muted">Owner</div><div>{personName(item.ownerId)}</div>
-            <div className="text-sd-muted">Origin</div><div>{item.origin === "customer" ? "Received from the customer" : "Created by SD Worx"}</div>
+            <div className="text-sd-muted">Origin</div><div>{item.origin === "customer" ? "Received from the customer" : "Created by SDWorx"}</div>
             <div className="text-sd-muted">Last change</div><div>{personName(last.byId)} · {fmtDate(last.at)}</div>
             <div className="text-sd-muted">Created</div><div>{personName(item.createdById)} · {fmtDate(item.createdAt)}</div>
             <div className="text-sd-muted">Topic</div><div>{item.topic}</div>
@@ -256,7 +256,7 @@ function UploadForm({ nodeId, country, categories, defaultCategory, onDone }: { 
       <textarea name="content" rows={2} placeholder="Short description of what is in the file" className="input w-full px-2.5 py-1.5 text-[13px]" />
       <div className="grid grid-cols-2 gap-2">
         <select name="category" defaultValue={defaultCategory} className="input px-2.5 py-1.5 text-[13px]">{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}<option value="other">Other</option></select>
-        <select name="origin" defaultValue="sdworx" className="input px-2.5 py-1.5 text-[13px]"><option value="sdworx">Created by SD Worx</option><option value="customer">Received from customer</option></select>
+        <select name="origin" defaultValue="sdworx" className="input px-2.5 py-1.5 text-[13px]"><option value="sdworx">Created by SDWorx</option><option value="customer">Received from customer</option></select>
         <input name="topic" placeholder="Topic (e.g. Payroll cutoff)" className="input px-2.5 py-1.5 text-[13px]" />
         <input name="scope" defaultValue={country ?? "all"} placeholder="Scope: BE, DE or all" className="input px-2.5 py-1.5 text-[13px]" />
       </div>

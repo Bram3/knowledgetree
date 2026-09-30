@@ -10,7 +10,7 @@ Pace: calm, about 150 words per minute. Short pauses at [pause], a longer pause 
 Tone: a colleague explaining a product they are proud of, not a commercial. No exclamation marks.
 Read the numbered steps as one continuous narration; do not read the step numbers or the screenshot names.
 
-1. Every payroll consultant at SD Worx knows this moment. A customer asks an urgent question. You find three documents with three answers. One is old, one has no owner, and one might be for another country. [pause] The information exists. The confidence does not. [beat]
+1. Every payroll consultant at SDWorx knows this moment. A customer asks an urgent question. You find three documents with three answers. One is old, one has no owner, and one might be for another country. [pause] The information exists. The confidence does not. [beat]
 
 2. This is KnowledgeTree. One organigram per customer. Every entity owns its knowledge. And every change has a name. [pause] Lena is a payroll consultant. She signs in and sees only the customers she is assigned to. [beat]
 
@@ -22,7 +22,7 @@ Read the numbered steps as one continuous narration; do not read the step number
 
 6. Lena clicks Nike Deutschland GmbH. The view zooms in and unfolds its product nodes. [beat]
 
-7. She opens Payroll. Two kinds of documents, kept apart. On top, what SD Worx wrote. Below, what the customer sent us, stored exactly as received. [beat]
+7. She opens Payroll. Two kinds of documents, kept apart. On top, what SDWorx wrote. Below, what the customer sent us, stored exactly as received. [beat]
 
 8. Documents are real. The Lohnsteuer registration opens right here, and can be downloaded in its original format. [beat]
 
@@ -53,7 +53,7 @@ Read the numbered steps as one continuous narration; do not read the step number
 | 4 | One answer with provenance | `step-03-answer.png` |
 | 5 | The organigram with fixed shelves | `step-04-organigram.png` |
 | 6 | Zoom into Nike Deutschland GmbH | `step-05-entity.png` |
-| 7 | The Payroll shelf, SD Worx vs customer | `step-06-payroll-shelf.png` |
+| 7 | The Payroll shelf, SDWorx vs customer | `step-06-payroll-shelf.png` |
 | 8 | Document viewer and download | `step-07-document.png` |
 | 9 | Note editor with a reason | `step-08-editor.png` |
 | 10 | Version history | `step-09-version-history.png` |

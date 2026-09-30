@@ -2,7 +2,7 @@
 
 **One organigram per customer. Every entity owns its knowledge. Every change has a name.**
 
-A proof of concept for the SD Worx hackathon challenge *Unlock the Knowledge Within: Find it. Understand it. Trust it.*
+A proof of concept for the SDWorx hackathon challenge *Unlock the Knowledge Within: Find it. Understand it. Trust it.*
 
 **Live demo:** https://knowledgetree-99869633039.europe-west1.run.app (pick any account on the login page, for example Lena Vermeulen)
 
@@ -10,7 +10,7 @@ A proof of concept for the SD Worx hackathon challenge *Unlock the Knowledge Wit
 
 ## The problem we picked
 
-A payroll consultant at SD Worx works for several customers, each with entities in several countries. The knowledge about those customers is scattered: contracts in SharePoint, a payroll calendar in an email, the cutoff date in a Teams chat, the rest in the head of the colleague who is leaving. When a customer asks an urgent question, the consultant finds three versions of the answer and cannot tell which one is current, who changed it, or whether it even applies to this country.
+A payroll consultant at SDWorx works for several customers, each with entities in several countries. The knowledge about those customers is scattered: contracts in SharePoint, a payroll calendar in an email, the cutoff date in a Teams chat, the rest in the head of the colleague who is leaving. When a customer asks an urgent question, the consultant finds three versions of the answer and cannot tell which one is current, who changed it, or whether it even applies to this country.
 
 Two moments of doubt from the challenge brief guided us:
 
@@ -23,8 +23,8 @@ Instead of searching a pile of documents, we give every customer a **living orga
 
 Three rules make the knowledge trustworthy by construction, without a "trust score":
 
-1. **Fixed shelves everywhere.** A customer subscribes to SD Worx products (Payroll, Time & Attendance, HR Administration, Legal & Compliance, Reporting, Contract & SLA). Every entity of that customer automatically carries the same product categories, even when empty. Nike Belgium and Nike Germany always have the same shelves, so nothing can hide in a random folder.
-2. **Our documents and their documents are separate.** In every category, documents created by SD Worx are kept apart from documents received from the customer. What the customer sent is stored as received; what we wrote is versioned by us.
+1. **Fixed shelves everywhere.** A customer subscribes to SDWorx products (Payroll, Time & Attendance, HR Administration, Legal & Compliance, Reporting, Contract & SLA). Every entity of that customer automatically carries the same product categories, even when empty. Nike Belgium and Nike Germany always have the same shelves, so nothing can hide in a random folder.
+2. **Our documents and their documents are separate.** In every category, documents created by SDWorx are kept apart from documents received from the customer. What the customer sent is stored as received; what we wrote is versioned by us.
 3. **Every change has a name.** Each file and note has an owner, a version history with a reason per version, and an audit trail. Outdated items are archived, never deleted, so history stays visible instead of competing with the current answer.
 
 Around the tree we added the two things a consultant actually uses all day: a **search prompt** that answers with the entity, owner and version of the fact, and **capture from Teams and Outlook**, so knowledge leaves the inbox the moment it is created.
@@ -41,7 +41,7 @@ People only see the customers they are assigned to. Search, the tree, the Teams 
 
 ### Ask a question, get the fact with its provenance
 
-The home page is a search prompt over your customers. The best match shows the entity it belongs to, the category, whether it is an SD Worx or a customer document, the owner, the version and the expert to call.
+The home page is a search prompt over your customers. The best match shows the entity it belongs to, the category, whether it is an SDWorx or a customer document, the owner, the version and the expert to call.
 
 ![Search prompt](docs/screenshots/02-search.png)
 
@@ -59,7 +59,7 @@ Every entity card shows the fixed product categories with item counts, how many 
 
 ### An entity, one product, two kinds of documents
 
-Nike Deutschland GmbH › Payroll: SD Worx notes on top, the Lohnsteuer registration received from the customer below. The note about the new cutoff renders as formatted text with its owner, origin, topic and full version history.
+Nike Deutschland GmbH › Payroll: SDWorx notes on top, the Lohnsteuer registration received from the customer below. The note about the new cutoff renders as formatted text with its owner, origin, topic and full version history.
 
 ![Entity and Payroll](docs/screenshots/06-entity-payroll.png)
 
@@ -117,7 +117,7 @@ Everything that changed on your customers, newest first, with a name on every li
 
 ## Team
 
-VIVES student team for the SD Worx hackathon 2026.
+VIVES student team for the SDWorx hackathon 2026.
 
 ---
 
@@ -135,7 +135,7 @@ Data lives in `data/db.json`, created from the seed on first start. **Reset demo
 
 ### Stack
 
-Next.js 16 (App Router, server actions, route handlers), React 19, Tailwind 4, React Flow with dagre for the organigram, react-markdown for notes. Branding follows the SD Worx Ignite design system (cdn.sdworx.com/ignite): primary blue #006dd8, dark navy #001c52, logo red and yellow, Inter for body text and SD Worx Display for headings. Tokens are in `src/app/globals.css`, the product catalog in `src/lib/catalog.ts`.
+Next.js 16 (App Router, server actions, route handlers), React 19, Tailwind 4, React Flow with dagre for the organigram, react-markdown for notes. Branding follows the SDWorx Ignite design system (cdn.sdworx.com/ignite): primary blue #006dd8, dark navy #001c52, logo red and yellow, Inter for body text and SD Worx Display for headings. Tokens are in `src/app/globals.css`, the product catalog in `src/lib/catalog.ts`.
 
 ### Project layout
 

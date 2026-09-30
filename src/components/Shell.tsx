@@ -30,7 +30,7 @@ export function Wordmark({ light = false }: { light?: boolean }) {
       </svg>
       <span className="leading-tight">
         <span className={`font-display block text-[15px] font-semibold ${light ? "text-white" : "text-sd-text"}`}>KnowledgeTree</span>
-        <span className={`block text-[10.5px] font-medium uppercase tracking-[0.12em] ${light ? "text-white/60" : "text-sd-muted"}`}>SD Worx</span>
+        <span className={`block text-[10.5px] font-medium uppercase tracking-[0.12em] ${light ? "text-white/60" : "text-sd-muted"}`}>SDWorx</span>
       </span>
     </span>
   );

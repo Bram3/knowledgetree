@@ -54,7 +54,7 @@ export type Item = {
   previewUrl?: string; // PDF preview when the original is not viewable inline
   topic: string;
   category: string; // product id from the catalog, or "other"
-  origin: "sdworx" | "customer"; // created by SD Worx, or received from the customer
+  origin: "sdworx" | "customer"; // created by SDWorx, or received from the customer
   scope: string[]; // country codes or ["all"]
   ownerId: string | null;
   verifiedById: string | null;

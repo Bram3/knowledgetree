@@ -122,7 +122,7 @@ function SaveDialog({ msg, onClose, onSaved }: { msg: Msg; onClose: () => void; 
                 <span className="ml-auto rounded-md bg-white px-1.5 py-0.5 text-[11px] font-semibold text-sd-primary">{Math.round(suggest.confidence * 100)}% match</span>
               </div>
             ) : <div className="mt-1.5 text-[12.5px] text-slate-400">Detecting customer and entity…</div>}
-            {suggest && <div className="mt-1.5 flex gap-1.5 text-[11.5px] text-slate-500"><span>Category: <b>{suggest.category}</b></span>·<span>Topic: <b>{suggest.topic}</b></span>·<span>Scope: <b>{suggest.country ?? "All countries"}</b></span>·<span>Origin: <b>SD Worx (internal chat)</b></span></div>}
+            {suggest && <div className="mt-1.5 flex gap-1.5 text-[11.5px] text-slate-500"><span>Category: <b>{suggest.category}</b></span>·<span>Topic: <b>{suggest.topic}</b></span>·<span>Scope: <b>{suggest.country ?? "All countries"}</b></span>·<span>Origin: <b>SDWorx (internal chat)</b></span></div>}
           </div>
           {suggest && suggest.related.length > 0 && <div className="rounded-lg bg-slate-50 px-3 py-2 text-[12px] text-slate-600">Already on this node about {suggest.topic.toLowerCase()}: <b>{suggest.related[0].title}</b>. This message is added as a new item with a link back to the chat.</div>}
           <label className="block text-[12px] font-medium text-slate-600">Title<input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-sd-navy" /></label>

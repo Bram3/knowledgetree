@@ -120,7 +120,7 @@ export function NoteEditor(props: EditProps | NewProps) {
         </div>
 
         <div className="flex items-center gap-2 border-t border-sd-border bg-sd-subtle px-5 py-3">
-          {props.mode === "edit" ? <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="What changed and why? (kept in the version history)" className="input flex-1 px-3 py-2 text-[13px]" /> : <span className="flex-1 text-[12.5px] text-sd-muted">Saved as an SD Worx note, version 1, under your name.</span>}
+          {props.mode === "edit" ? <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="What changed and why? (kept in the version history)" className="input flex-1 px-3 py-2 text-[13px]" /> : <span className="flex-1 text-[12.5px] text-sd-muted">Saved as an SDWorx note, version 1, under your name.</span>}
           <button type="button" onClick={props.onClose} className="btn-secondary px-3 py-2 text-[13px]">Cancel</button>
           <button type="button" disabled={pending || !content.trim()} onClick={submit} className="btn-primary px-4 py-2 text-[13px] disabled:opacity-50">{pending ? "Saving…" : props.mode === "edit" ? "Save new version" : "Create note"}</button>
         </div>

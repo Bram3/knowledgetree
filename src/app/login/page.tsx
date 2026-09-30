@@ -18,7 +18,7 @@ export default async function LoginPage() {
           <h1 className="max-w-md text-[34px] font-semibold leading-tight tracking-tight">One organigram per customer. Every node owns its knowledge.</h1>
           <p className="mt-4 max-w-md text-[15px] leading-relaxed text-white/60">Files, notes, contacts and experts live on the entity they belong to. Every change carries a name and a date. You only see the customers you are assigned to.</p>
         </div>
-        <p className="text-[12px] text-white/40">Hackathon proof of concept · SD Worx · Unlock the Knowledge Within</p>
+        <p className="text-[12px] text-white/40">Hackathon proof of concept · SDWorx · Unlock the Knowledge Within</p>
       </div>
       <div className="flex items-center justify-center bg-white p-10">
         <div className="w-full max-w-md">

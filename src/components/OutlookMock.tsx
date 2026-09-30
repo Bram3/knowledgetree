@@ -12,7 +12,7 @@ As discussed with Sofie, please find attached the new payroll calendar for Nike 
 
 Important: from the October run the cutoff for variable input moves from the 15th to the 18th of the month, because of our new time registration system. Pay date remains the 25th.
 
-Could you confirm that SD Worx has this on file? We had some confusion last year with different versions floating around.
+Could you confirm that SDWorx has this on file? We had some confusion last year with different versions floating around.
 
 Mit freundlichen Grüßen,
 Katrin Vogel
@@ -98,7 +98,7 @@ function AddInPane({ sel }: { sel: (typeof mails)[number] }) {
             <div className="fade-up">
               <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">What the tree knows</div>
               <ul className="mt-1.5 space-y-1">
-                {summary.items.slice(0, 4).map((i) => <li key={i.id} className="flex items-center gap-2 rounded-md bg-white px-2.5 py-1.5 text-[12px] ring-1 ring-slate-100">{i.kind === "note" ? <StickyNote className="h-3.5 w-3.5 text-amber-500" /> : <FileText className="h-3.5 w-3.5 text-slate-500" />}<span className="min-w-0 flex-1 truncate">{i.title}</span><span className="text-[10px] font-medium uppercase text-slate-400">{i.origin === "customer" ? "customer" : "SD Worx"}</span></li>)}
+                {summary.items.slice(0, 4).map((i) => <li key={i.id} className="flex items-center gap-2 rounded-md bg-white px-2.5 py-1.5 text-[12px] ring-1 ring-slate-100">{i.kind === "note" ? <StickyNote className="h-3.5 w-3.5 text-amber-500" /> : <FileText className="h-3.5 w-3.5 text-slate-500" />}<span className="min-w-0 flex-1 truncate">{i.title}</span><span className="text-[10px] font-medium uppercase text-slate-400">{i.origin === "customer" ? "customer" : "SDWorx"}</span></li>)}
                 {!summary.items.length && <li className="text-[12px] text-slate-400">Nothing captured on this node yet.</li>}
               </ul>
               {summary.experts.length > 0 && <div className="mt-1.5 text-[11.5px] text-slate-500">Experts: {summary.experts.join(", ")}</div>}

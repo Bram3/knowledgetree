@@ -23,7 +23,7 @@ export function CategoryChip({ id, size = "sm" }: { id: string; size?: "sm" | "m
 export function OriginBadge({ origin }: { origin: "sdworx" | "customer" }) {
   return origin === "customer"
     ? <span className="inline-flex items-center gap-1 rounded-[4px] bg-sd-gold/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-700"><ArrowDownLeft className="h-3 w-3" /> from customer</span>
-    : <span className="inline-flex items-center gap-1 rounded-[4px] bg-sd-navy/10 px-1.5 py-0.5 text-[11px] font-medium text-sd-navy"><Building2 className="h-3 w-3" /> SD Worx</span>;
+    : <span className="inline-flex items-center gap-1 rounded-[4px] bg-sd-navy/10 px-1.5 py-0.5 text-[11px] font-medium text-sd-navy"><Building2 className="h-3 w-3" /> SDWorx</span>;
 }
 
 export function KindIcon({ kind, fileName, className = "h-4 w-4" }: { kind: "file" | "note"; fileName?: string; className?: string }) {

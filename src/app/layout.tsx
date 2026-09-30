@@ -7,7 +7,7 @@ import { getCurrentUser } from "@/lib/auth";
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "KnowledgeTree · SD Worx",
+  title: "KnowledgeTree · SDWorx",
   description: "One organigram per customer. Every node owns its knowledge. Every change has a name.",
 };
 

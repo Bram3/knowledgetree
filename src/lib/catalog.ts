@@ -1,4 +1,4 @@
-// Fixed SD Worx product categories. A customer subscribes to a subset; every node of that
+// Fixed SDWorx product categories. A customer subscribes to a subset; every node of that
 // customer automatically carries those categories.
 export type Product = { id: string; name: string; short: string; color: string };
 
@@ -18,4 +18,4 @@ export function product(id: string): Product {
   return PRODUCTS.find((p) => p.id === id) ?? OTHER_CATEGORY;
 }
 
-export const ORIGIN_LABEL = { sdworx: "SD Worx documents", customer: "Received from customer" } as const;
+export const ORIGIN_LABEL = { sdworx: "SDWorx documents", customer: "Received from customer" } as const;
