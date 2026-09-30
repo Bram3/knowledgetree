@@ -1,26 +1,114 @@
 @import "tailwindcss";
+@import "@xyflow/react/dist/style.css";
+
+/* SD Worx Ignite design system tokens (cdn.sdworx.com/ignite, v2) */
+@theme inline {
+  --font-sans: var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: "SD Worx Display VF", "SD Worx Display", var(--font-inter), "Inter", sans-serif;
+  --font-mono: Consolas, ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-sd-dark: #001c52;          /* primary strong */
+  --color-sd-darker: #000d3a;        /* primary strong pressed */
+  --color-sd-navy: #212223;          /* neutral strong */
+  --color-sd-primary: #006dd8;       /* primary bold */
+  --color-sd-primary-hover: #0087f3; /* primary bold hover */
+  --color-sd-primary-soft: #d9f1ff;  /* primary soft */
+  --color-sd-primary-subtle: #effaff;
+  --color-sd-red: #f1002f;           /* logo */
+  --color-sd-yellow: #ffbe00;        /* logo */
+  --color-sd-gold: #ffbe00;
+  --color-sd-accent: #da3300;        /* accent 0 */
+  --color-sd-subtle: #f4f5f6;        /* page soft */
+  --color-sd-border: #d9dbdd;        /* neutral 200 */
+  --color-sd-text: #050607;          /* text strong */
+  --color-sd-muted: #737476;         /* neutral 600 */
+}
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --sd-primary-dark: #001c52;
+  --sd-primary: #006dd8;
+  --sd-primary-hover: #0087f3;
+  --sd-primary-pressed: #005bbf;
+  --sd-bg-main: #ffffff;
+  --sd-bg-subtle: #f4f5f6;
+  --sd-bg-soft: #fbfcfc;
+  --sd-border: #d9dbdd;
+  --sd-text-main: #050607;
+  --sd-text-muted: #737476;
+  --sd-radius-sm: 2px;
+  --sd-radius: 4px;
+  --sd-radius-lg: 8px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+html, body { height: 100%; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--sd-bg-subtle);
+  color: var(--sd-text-main);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }
+
+h1, h2, .font-display { font-family: var(--font-display); letter-spacing: -0.01em; }
+
+* { scrollbar-width: thin; scrollbar-color: #d9dbdd transparent; }
+
+.card {
+  background: var(--sd-bg-main);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+}
+
+.btn-primary {
+  background: var(--sd-primary);
+  color: #fff;
+  border-radius: var(--sd-radius);
+  font-weight: 500;
+}
+.btn-primary:hover { background: var(--sd-primary-hover); }
+.btn-secondary {
+  background: #fff;
+  color: var(--sd-text-main);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  font-weight: 500;
+}
+.btn-secondary:hover { background: var(--sd-bg-subtle); }
+.input {
+  background: #fff;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  outline: none;
+}
+.input:focus { border-color: var(--sd-primary); }
+
+.react-flow__attribution { font-size: 9px; opacity: 0.6; }
+.react-flow__node { cursor: pointer; transition: transform 0.35s ease; }
+.react-flow__edge-path { stroke: #c4c7ca; stroke-width: 1.5; }
+.react-flow__controls { border: 1px solid var(--sd-border); border-radius: var(--sd-radius); overflow: hidden; box-shadow: none; }
+.react-flow__controls button { border-bottom: 1px solid var(--sd-border); background: white; }
+.react-flow__controls button:hover { background: var(--sd-bg-subtle); }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fade-up 0.25s ease-out both; }
+
+/* markdown notes */
+.md { line-height: 1.6; color: var(--sd-text-main); }
+.md > :first-child { margin-top: 0; }
+.md p { margin: 0 0 0.6em; }
+.md h1, .md h2, .md h3 { font-family: var(--font-sans); font-weight: 600; margin: 1em 0 0.4em; line-height: 1.3; }
+.md h1 { font-size: 1.25em; } .md h2 { font-size: 1.1em; } .md h3 { font-size: 1em; }
+.md ul, .md ol { margin: 0 0 0.6em 1.25em; } .md ul { list-style: disc; } .md ol { list-style: decimal; }
+.md li { margin: 0.15em 0; }
+.md blockquote { margin: 0.6em 0; padding: 0.4em 0.9em; border-left: 3px solid var(--sd-primary); background: var(--sd-bg-subtle); color: var(--sd-text-muted); border-radius: 0 4px 4px 0; }
+.md code { font-family: var(--font-mono); font-size: 0.9em; background: var(--sd-bg-subtle); padding: 0.1em 0.35em; border-radius: 3px; }
+.md pre { background: var(--sd-bg-subtle); padding: 0.75em; border-radius: 4px; overflow-x: auto; margin: 0.6em 0; }
+.md table { border-collapse: collapse; width: 100%; margin: 0.6em 0; font-size: 0.95em; }
+.md th, .md td { border: 1px solid var(--sd-border); padding: 0.35em 0.6em; text-align: left; vertical-align: top; }
+.md th { background: var(--sd-bg-subtle); font-weight: 600; }
+.md a { color: var(--sd-primary); text-decoration: underline; }
+.md hr { border: 0; border-top: 1px solid var(--sd-border); margin: 0.8em 0; }
+.md strong { font-weight: 600; }
