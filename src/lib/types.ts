@@ -40,6 +40,7 @@ export type Version = {
   byId: string;
   at: string;
   note: string;
+  source?: LeafSource & { leafId: string }; // the call/mail that corrected the note (conflict resolved with "Correct")
 };
 
 export type Item = {
@@ -77,7 +78,11 @@ export type ActivityAction =
   | "new_version"
   | "node_added"
   | "captured_teams"
-  | "captured_outlook";
+  | "captured_outlook"
+  | "leaf_conflict"
+  | "leaf_reconfirmed"
+  | "leaf_kept"
+  | "leaf_deferred";
 
 export type Activity = {
   id: string;
@@ -127,7 +132,10 @@ export type Leaf = {
   status: LeafStatus;
   reconfirmedAt: string[]; // ×n label = length + 1
   usefulCount: number;
-  conflictsWith?: string;
+  conflictsWith?: string; // id of the note (Item) this leaf contradicts
+  conflictClaims?: { said: string; noted: string }; // short claims for the owner's card: "Katrin said the 20th, your note says the 18th"
+  deferredAt?: string; // the owner tapped "Not sure": the conflict waits in the digest, no card
+  reconfirmedBy?: LeafSource[]; // the sources behind reconfirmedAt (same order), so re-ingesting one is idempotent
   promotedToItemId?: string;
   verifiedById?: string;
 };
