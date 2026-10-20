@@ -36,32 +36,52 @@ export class ModelUnavailableError extends Error {
 export function geminiConfig() {
   return {
     project: process.env.GOOGLE_CLOUD_PROJECT || "",
-    location: process.env.GOOGLE_CLOUD_LOCATION || "europe-west1",
-    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+    location: process.env.GOOGLE_CLOUD_LOCATION || "us-east1",
+    model: process.env.GEMINI_MODEL || "gemini-3.5-flash",
+    fallbackModel: process.env.GEMINI_FALLBACK_MODEL || "gemini-2.5-flash", // tried when the default model fails, before the cache
     timeoutMs: Number(process.env.GEMINI_TIMEOUT_MS) || 15000,
     preferCache: process.env.GEMINI_PREFER_CACHE === "1",
   };
 }
 
-/** Gemini on Vertex AI via @google/genai in vertexai mode. Loaded lazily so tests and builds never construct it. */
-export function vertexClient(cfg = geminiConfig()): ModelClient {
+/** One call to one Gemini model on Vertex AI. */
+export type CallModel = (model: string, req: ModelRequest) => Promise<string>;
+
+/** @google/genai in vertexai mode. Loaded lazily so tests and builds never construct it. */
+function callVertex(cfg: { project: string; location: string }): CallModel {
+  return async (model, req) => {
+    const { GoogleGenAI } = await import("@google/genai");
+    const ai = new GoogleGenAI({ vertexai: true, project: cfg.project, location: cfg.location });
+    const res = await ai.models.generateContent({
+      model,
+      contents: [{ role: "user", parts: req.parts }],
+      config: {
+        systemInstruction: req.system,
+        temperature: 0,
+        abortSignal: req.signal,
+        ...(req.schema ? { responseMimeType: "application/json", responseJsonSchema: req.schema } : {}),
+      },
+    });
+    if (!res.text) throw new Error("Gemini returned an empty response");
+    return res.text;
+  };
+}
+
+/**
+ * Gemini on Vertex AI: the default model, then the fallback model when the default one fails (quota, outage).
+ * `call` is the seam for tests; by default it is @google/genai with ADC.
+ */
+export function vertexClient(cfg = geminiConfig(), call: CallModel = callVertex(cfg)): ModelClient {
   return {
     async generate(req) {
       if (!cfg.project) throw new ModelUnavailableError("GOOGLE_CLOUD_PROJECT is not set");
-      const { GoogleGenAI } = await import("@google/genai");
-      const ai = new GoogleGenAI({ vertexai: true, project: cfg.project, location: cfg.location });
-      const res = await ai.models.generateContent({
-        model: cfg.model,
-        contents: [{ role: "user", parts: req.parts }],
-        config: {
-          systemInstruction: req.system,
-          temperature: 0,
-          abortSignal: req.signal,
-          ...(req.schema ? { responseMimeType: "application/json", responseJsonSchema: req.schema } : {}),
-        },
-      });
-      if (!res.text) throw new Error("Gemini returned an empty response");
-      return res.text;
+      try {
+        return await call(cfg.model, req);
+      } catch (err) {
+        if (req.signal?.aborted || !cfg.fallbackModel || cfg.fallbackModel === cfg.model) throw err;
+        console.warn(`Gemini ${cfg.model} failed, trying ${cfg.fallbackModel}:`, (err as Error).message);
+        return call(cfg.fallbackModel, req);
+      }
     },
   };
 }
