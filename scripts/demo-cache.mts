@@ -127,6 +127,21 @@ for (const l of demoLeaves) {
   for (const o of leavesOn(l)) RESPONSES.push({ purpose: "compare", input: compareText(l, describeLeaf(o)), response: verdict(l, { leaf: o }) });
 }
 
+// ---------- SECOND THOUGHT (#19, scene 2b): Lena's draft to sarah@nike.fr says the cutoff is the 15th ----------
+// Claims are extracted per sentence with a number (draftSentences), then compared with the France leaf (the 20th).
+// "Change to 20th" rewrites the sentence; the rewritten draft agrees with the leaf, so it is cached too.
+const { DEMO_DRAFT } = await import("../src/lib/demo-draft.ts");
+const { claimsText, draftSentences } = await import("../src/lib/second-thought-prompt.ts");
+const franceLeaf = seed.leaves.find((l) => l.id === "sl-fr-1")!;
+const draftSentence = draftSentences(DEMO_DRAFT.text)[0];
+for (const [said, relation] of [["the 15th", contradicts], ["the 20th", same]] as const) {
+  const sentence = draftSentence.replace("the 15th", said);
+  const statement = `The payroll cutoff date for Nike France is ${said}.`;
+  RESPONSES.push({ purpose: "claims", input: claimsText("Nike EMEA › France", sentence), response: { claims: [{ statement, category: "payroll" }] } });
+  const response = relation === contradicts ? { relation: "contradicts", said: "the 15th", noted: "the 20th" } : relation;
+  RESPONSES.push({ purpose: "compare", input: compareText({ channel: "mail", saidBy: "Lena Vermeulen", statement, quote: sentence }, describeLeaf(franceLeaf)), response });
+}
+
 const file = path.join(import.meta.dirname, "../src/lib/gemini-cache.json");
 const cache: Record<string, string> = {};
 for (const r of RESPONSES) cache[cacheKeyFor(r.purpose, r.input)] = typeof r.response === "string" ? r.response : JSON.stringify(r.response);

@@ -30,8 +30,9 @@ export function leafIcon(leaves: Pick<Leaf, "status">[]) {
 }
 
 /** Seed or conflict marker next to the type badge. Nothing for an ordinary leaf. */
-export function LeafStatusBadge({ leaf }: { leaf: Pick<Leaf, "status" | "deferredAt"> }) {
+export function LeafStatusBadge({ leaf }: { leaf: Pick<Leaf, "status" | "deferredAt" | "doubtedAt"> }) {
   if (leaf.status === "seed") return <span className="text-[10.5px] font-medium text-amber-700">🌱 seed, waiting for a place</span>;
+  if (leaf.doubtedAt && leaf.status !== "fallen") return <span className="text-[10.5px] font-semibold text-amber-800" title="Someone said the opposite is correct; the branch owner was asked once">🍂 in doubt, owner asked</span>;
   if (leaf.status === "conflict")
     return <span className="text-[10.5px] font-semibold text-red-600" title="Contradicts a note; its owner was asked once">⚠️ conflicts with a note{leaf.deferredAt ? " · in the digest" : ", owner asked"}</span>;
   return null;

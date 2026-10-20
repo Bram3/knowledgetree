@@ -47,8 +47,11 @@ export function seasonOf(f: number): Season {
   return "green";
 }
 
+/** A leaf in doubt (#19: the opposite was said to be correct, the owner hasn't answered yet) is at most brown. */
 export function season(leaf: Leaf, now: Date): Season {
-  return leaf.status === "fallen" ? "fallen" : seasonOf(freshness(leaf, now));
+  if (leaf.status === "fallen") return "fallen";
+  const s = seasonOf(freshness(leaf, now));
+  return leaf.doubtedAt && (s === "green" || s === "yellow") ? "brown" : s;
 }
 
 /** On the tree at `now`: not promoted and not fallen (marked fallen, or faded below the threshold). */

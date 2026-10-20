@@ -64,5 +64,9 @@
   "compare:494b40f3610ac564e3f79f6c63a5b8ef": "{\"relation\":\"unrelated\",\"said\":null,\"noted\":null}",
   "compare:0adc1da2a0b44720288d0f98d48c3e31": "{\"relation\":\"unrelated\",\"said\":null,\"noted\":null}",
   "compare:e1d64e17b4e40656258efdb01a2f1c55": "{\"relation\":\"unrelated\",\"said\":null,\"noted\":null}",
-  "compare:d068cc7df22ed6e2cad8d7b84ee27d5e": "{\"relation\":\"unrelated\",\"said\":null,\"noted\":null}"
+  "compare:d068cc7df22ed6e2cad8d7b84ee27d5e": "{\"relation\":\"unrelated\",\"said\":null,\"noted\":null}",
+  "claims:aaae1ac7edcbba00c529356d3b3f6ff3": "{\"claims\":[{\"statement\":\"The payroll cutoff date for Nike France is the 15th.\",\"category\":\"payroll\"}]}",
+  "compare:a5605560dc167e660ae93b3eaa1d1779": "{\"relation\":\"contradicts\",\"said\":\"the 15th\",\"noted\":\"the 20th\"}",
+  "claims:bbb8a6696f3513be495714f410a0f7d9": "{\"claims\":[{\"statement\":\"The payroll cutoff date for Nike France is the 20th.\",\"category\":\"payroll\"}]}",
+  "compare:2cbd9e19e6ac09359e97788eb616f534": "{\"relation\":\"same\",\"said\":null,\"noted\":null}"
 }
