@@ -1,4 +1,5 @@
 import type { Db, Item } from "./types";
+import { seedLeaves } from "./seed-leaves";
 
 // Demo clock: 2026-09-30
 const d = (daysAgo: number, hour = 10) => {
@@ -165,4 +166,4 @@ const activity = [
   { id: "a15", at: d(70, 10), actorId: "tom", action: "new_version" as const, companyId: "arcelormittal", nodeId: "am-be-gent", itemId: "i-am-gent-shift", summary: "uploaded version 2 of Shift premium table Gent" },
 ];
 
-export const seed: Db = { people, companies, nodes, items, activity, leaves: [] };
+export const seed: Db = { people, companies, nodes, items, activity, leaves: seedLeaves, handovers: [] };

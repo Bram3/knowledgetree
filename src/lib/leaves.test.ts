@@ -43,10 +43,10 @@ describe("leaf store", () => {
     expect(updateLeaf("missing", () => {})).toBeNull();
   });
 
-  it("Reset demo data removes caught leaves", () => {
+  it("Reset demo data removes caught leaves (back to the seeded ones)", () => {
     addLeaves([leaf({ id: "a" })]);
     resetDb();
-    expect(getDb().leaves).toEqual([]);
+    expect(getDb().leaves.map((l) => l.id)).toEqual(seed.leaves.map((l) => l.id));
   });
 
   it("a db.json written before leaves existed still loads", () => {
