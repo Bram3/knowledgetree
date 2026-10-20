@@ -26,3 +26,6 @@ data/uploads/
 CLAUDE.md
 AGENTS.md
 /tmp
+
+# Gemini answers cached at runtime (fallback when Vertex is unreachable)
+data/gemini-cache.json
