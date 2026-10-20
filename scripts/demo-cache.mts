@@ -6,7 +6,7 @@
  *
  * Keys must match `cacheKeyFor(purpose, input)` in src/lib/gemini.ts; src/lib/ingest.test.ts checks the demo mails.
  * Entries already in the file are kept, so you can also paste real Vertex answers from data/gemini-cache.json.
- * Later channels (call, ...) add their own entries to RESPONSES below. src/lib/demo-teams.test.ts checks the Teams chat.
+ * Later channels add their own entries to RESPONSES below. src/lib/demo-teams.test.ts checks the Teams chat, src/lib/demo-call.test.ts the call.
  */
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -17,6 +17,10 @@ import { DEMO_TEAMS_MESSAGES } from "../src/lib/demo-teams.ts";
 const cacheKeyFor = (purpose: string, input: string) => `${purpose}:${crypto.createHash("sha256").update(input.trim()).digest("hex").slice(0, 32)}`;
 const mailText = (id: string) => mailIngestInput(DEMO_MAILS.find((m) => m.id === id)!).text;
 const teamsText = (id: string) => DEMO_TEAMS_MESSAGES.find((m) => m.id === id)!.text;
+// Demo call (ticket #6): the transcript is keyed on the base64 audio, the leaves on the transcript.
+const demoDir = path.join(import.meta.dirname, "../public/demo");
+const callAudio = fs.readFileSync(path.join(demoDir, "nike-call.mp3")).toString("base64");
+const callTranscript = fs.readFileSync(path.join(demoDir, "nike-call-transcript.txt"), "utf8");
 
 const RESPONSES: { purpose: string; input: string; response: unknown }[] = [
   {
@@ -62,10 +66,21 @@ const RESPONSES: { purpose: string; input: string; response: unknown }[] = [
       { type: "promise", statement: "Katrin Vogel will send the new Nike Germany payroll calendar by mail.", why: null, quote: "Katrin will send the new calendar by mail.", people: ["Katrin Vogel"], confidence: 0.7, nodeId: "nk-de-gmbh", category: "payroll" },
     ] },
   },
+  // Demo call Lena ↔ Katrin (ticket #6). Transcript = the script the audio was generated from; small talk gives no leaves.
+  { purpose: "transcript", input: callAudio, response: callTranscript.trim() },
+  {
+    purpose: "leaves",
+    input: callTranscript,
+    response: { leaves: [
+      { type: "change", statement: "From next month the payroll cutoff for Nike Deutschland GmbH moves from the 15th to the 20th.", why: null, quote: "From next month, the payroll cutoff for Nike Deutschland GmbH moves from the fifteenth to the twentieth.", people: ["Katrin Vogel"], confidence: 0.93, nodeId: "nk-de-gmbh", category: "payroll" },
+      { type: "attention", statement: "Bonus changes at Nike Deutschland GmbH need approval from the Betriebsrat (works council) first.", why: "German co-determination: the works council must approve bonus changes.", quote: "bonus changes need approval from the Betriebsrat first, our works council.", people: ["Katrin Vogel"], confidence: 0.9, nodeId: "nk-de-gmbh", category: "payroll" },
+      { type: "expertise", statement: "Jonas Becker handled the Betriebsrat approval for bonus changes at Nike Deutschland GmbH last year.", why: null, quote: "Jonas handled that approval last year.", people: ["Jonas Becker"], confidence: 0.85, nodeId: "nk-de-gmbh", category: "payroll" },
+    ] },
+  },
 ];
 
 const file = path.join(import.meta.dirname, "../src/lib/gemini-cache.json");
 const cache: Record<string, string> = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
-for (const r of RESPONSES) cache[cacheKeyFor(r.purpose, r.input)] = JSON.stringify(r.response);
+for (const r of RESPONSES) cache[cacheKeyFor(r.purpose, r.input)] = typeof r.response === "string" ? r.response : JSON.stringify(r.response);
 fs.writeFileSync(file, JSON.stringify(cache, null, 2) + "\n");
 console.log(`Wrote ${RESPONSES.length} demo responses to ${path.relative(process.cwd(), file)}`);
