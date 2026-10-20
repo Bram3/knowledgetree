@@ -31,6 +31,13 @@ export const SEASON_META: Record<Season, { label: string; color: string; border:
   fallen: { label: "Fallen", color: "#78716c", border: "border-stone-300" },
 };
 
+/** ×n: the same fact heard n times. Each reconfirmation is a deeper green. */
+function ReconfirmedLabel({ times, sources = [] }: { times: number; sources?: Leaf["source"][] }) {
+  const shade = times >= 4 ? "bg-emerald-800" : times === 3 ? "bg-emerald-700" : "bg-emerald-600";
+  const from = sources.map((x) => `${x.channel}${x.from ? ` from ${x.from.replace(/\s*<.*>$/, "")}` : ""}`).join(", ");
+  return <span className={`rounded-full px-1.5 py-0.5 text-[10.5px] font-bold text-white ${shade}`} title={`Heard ${times} times${from ? `, also via ${from}` : ""}`}>×{times}</span>;
+}
+
 /** Link back to the message a leaf came from, for channels whose mock can show it (Teams: `teams:<message id>`). */
 function sourceHref(leaf: Leaf) {
   const m = /^teams:([\w-]+)$/.exec(leaf.source.ref);
@@ -48,12 +55,17 @@ export function LeafCard({ leaf }: { leaf: Leaf | FreshLeaf }) {
   const ch = CHANNEL_META[leaf.source.channel];
   const fresh = "freshness" in leaf ? leaf : null;
   const s = fresh ? SEASON_META[fresh.season] : null;
-  const border = leaf.status === "seed" ? "border-dashed border-amber-300" : s?.border ?? "border-emerald-200";
+  const times = leaf.reconfirmedAt.length + 1;
+  const conflict = leaf.status === "conflict";
+  const border = leaf.status === "seed" ? "border-dashed border-amber-300" : conflict ? "border-red-300 bg-red-50/40" : s?.border ?? "border-emerald-200";
   return (
-    <div className={`fade-up rounded-[8px] border bg-white p-3 ${border} ${fresh?.season === "fallen" ? "opacity-70" : ""}`} style={s ? { borderLeftWidth: 4, borderLeftColor: s.color } : undefined}>
+    <div className={`fade-up rounded-[8px] border bg-white p-3 ${border} ${fresh?.season === "fallen" ? "opacity-70" : ""}`} style={s || conflict ? { borderLeftWidth: 4, borderLeftColor: conflict ? "#dc2626" : s!.color } : undefined}>
       <div className="flex flex-wrap items-center gap-1.5">
         <LeafTypeBadge type={leaf.type} />
         {leaf.status === "seed" && <span className="text-[10.5px] font-medium text-amber-700">🌱 seed, waiting for a place</span>}
+        {conflict && <span className="text-[10.5px] font-semibold text-red-600" title="Contradicts a note; its owner was asked once">⚠️ conflicts with a note{leaf.deferredAt ? " · in the digest" : ", owner asked"}</span>}
+        {leaf.status === "verified" && <span className="text-[10.5px] font-semibold text-emerald-700">✓ verified{leaf.verifiedById ? ` by ${personName(leaf.verifiedById)}` : ""}</span>}
+        {times > 1 && <ReconfirmedLabel times={times} sources={leaf.reconfirmedBy} />}
         <span className="ml-auto text-[10.5px] font-semibold text-sd-muted" title="Confidence">{Math.round(leaf.confidence * 100)}%</span>
       </div>
       <div className="mt-1.5 text-[13px] font-medium leading-snug">{leaf.statement}</div>

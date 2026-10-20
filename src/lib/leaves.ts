@@ -67,6 +67,8 @@ export type LeafCount = {
   byCategory: Record<string, number>; // current, placed leaves
   seasons: SeasonCount; // placed leaves by colour
   categorySeasons: Record<string, SeasonCount>;
+  conflicts: number; // placed leaves that contradict a note (shown in red)
+  categoryConflicts: Record<string, number>;
 };
 
 const noSeasons = (): SeasonCount => ({ green: 0, yellow: 0, brown: 0 });
@@ -74,7 +76,7 @@ const noSeasons = (): SeasonCount => ({ green: 0, yellow: 0, brown: 0 });
 /** Leaf counts per node of a customer at `now`, for the tree indicators. Seeds are counted apart from categories. */
 export function leafCounts(companyId: string, now: Date): Record<string, LeafCount> {
   const out: Record<string, LeafCount> = {};
-  for (const n of companyNodes(companyId)) out[n.id] = { total: 0, seeds: 0, fallen: 0, byCategory: {}, seasons: noSeasons(), categorySeasons: {} };
+  for (const n of companyNodes(companyId)) out[n.id] = { total: 0, seeds: 0, fallen: 0, byCategory: {}, seasons: noSeasons(), categorySeasons: {}, conflicts: 0, categoryConflicts: {} };
   for (const l of getDb().leaves) {
     const c = out[l.nodeId];
     if (!c || l.status === "promoted") continue;
@@ -91,6 +93,10 @@ export function leafCounts(companyId: string, now: Date): Record<string, LeafCou
     c.byCategory[l.category] = (c.byCategory[l.category] ?? 0) + 1;
     c.seasons[s]++;
     (c.categorySeasons[l.category] ??= noSeasons())[s]++;
+    if (l.status === "conflict") {
+      c.conflicts++;
+      c.categoryConflicts[l.category] = (c.categoryConflicts[l.category] ?? 0) + 1;
+    }
   }
   return out;
 }

@@ -7,9 +7,10 @@ import { askBot, type BotAnswer } from "@/lib/actions";
 import { ingestText, type IngestedLeaf } from "@/lib/leaf-actions";
 import { DEMO_TEAMS_MESSAGES, teamsReactionInput } from "@/lib/demo-teams";
 import { stripMarkdown } from "@/lib/text";
+import { ConflictCards } from "./ConflictCards";
 
 /** What a 🍃 reaction on a message grew: still thinking, leaves on a node, nothing worth keeping, or a failure. */
-type Reaction = { state: "pending" } | { state: "kept"; leaves: IngestedLeaf[]; companyId: string } | { state: "nothing" } | { state: "failed" };
+type Reaction = { state: "pending" } | { state: "kept"; leaves: IngestedLeaf[]; reconfirmed: number; companyId: string } | { state: "nothing" } | { state: "failed" };
 type Msg = { id: string; from: string; initials: string; color: string; at: string; text: string; bot?: BotAnswer; me?: boolean; leaf?: Reaction };
 
 export function TeamsMock() {
@@ -40,7 +41,10 @@ export function TeamsMock() {
     if (m.leaf && m.leaf.state !== "failed") return;
     setReaction(m.id, { state: "pending" });
     ingestText(teamsReactionInput(m))
-      .then((r) => setReaction(m.id, r.leaves.length && r.companyId ? { state: "kept", leaves: r.leaves, companyId: r.companyId } : { state: "nothing" }))
+      .then((r) => {
+        const all = [...r.leaves, ...r.reconfirmed]; // a reconfirmation makes no new leaf, it strengthens a known one (×n)
+        setReaction(m.id, all.length && r.companyId ? { state: "kept", leaves: all, reconfirmed: r.reconfirmed.length, companyId: r.companyId } : { state: "nothing" });
+      })
       .catch(() => setReaction(m.id, { state: "failed" }));
   };
 
@@ -117,6 +121,7 @@ export function TeamsMock() {
           <div className="mt-1.5 text-[11px] text-[#616161]">React <b>🍃</b> to a message to keep it in the tree · mention <b>@KnowledgeTree</b> to ask the tree</div>
         </div>
       </div>
+      <ConflictCards />
     </div>
   );
 }
@@ -133,7 +138,7 @@ function LeafReaction({ r }: { r: Reaction }) {
     <div className="mt-2 space-y-1.5">
       {pill}
       <Link href={`/customers/${r.companyId}?node=${first.nodeId}`} className="fade-up flex items-center gap-1.5 rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11.5px] font-medium text-emerald-800">
-        <span>{seed ? "🌱" : "🍃"} {r.leaves.length} {r.leaves.length === 1 ? "leaf" : "leaves"} {seed ? "waiting at" : "on"}</span>
+        <span>{seed ? "🌱" : "🍃"} {r.reconfirmed === r.leaves.length ? `known leaf ×${first.reconfirmedAt.length + 1}` : `${r.leaves.length} ${r.leaves.length === 1 ? "leaf" : "leaves"}${r.reconfirmed ? `, ${r.reconfirmed} reconfirmed` : ""}`} {seed ? "waiting at" : "on"}</span>
         <span className="flex flex-wrap items-center gap-1 text-sd-text">{first.path.map((p, i) => <span key={i} className="flex items-center gap-1">{i > 0 && <ChevronRight className="h-3 w-3" />}{p}</span>)}</span>
         <ExternalLink className="ml-auto h-3 w-3" />
       </Link>

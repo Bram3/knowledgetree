@@ -37,11 +37,11 @@ function viewAs(user: Person, asPersonId?: string): Person {
 }
 
 /** People the signed-in user may switch the Teams mock to (themselves included). */
-export async function viewAsOptions(): Promise<{ id: string; name: string; initials: string; color: string }[]> {
+export async function viewAsOptions(): Promise<{ id: string; name: string; me: boolean }[]> {
   const user = await requireUser();
   return getDb().people
     .filter((p) => p.id === user.id || p.customerIds.some((c) => user.customerIds.includes(c)))
-    .map((p) => ({ id: p.id, name: p.name, initials: p.initials, color: p.color }));
+    .map((p) => ({ id: p.id, name: p.name, me: p.id === user.id }));
 }
 
 /** Open conflict cards for the signed-in user, or for the person they view the Teams mock as. */

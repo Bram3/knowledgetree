@@ -1,7 +1,7 @@
 import "@/test/next-mocks";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ingest } from "./ingest";
-import { leavesForNode } from "./leaves";
+import { leafCounts, leavesForNode } from "./leaves";
 import { getDb, resetDb, person } from "./db";
 import type { ModelClient, ModelRequest } from "./gemini";
 import { DEMO_MAILS, mailIngestInput } from "./demo-mails";
@@ -69,6 +69,13 @@ describe("compare at ingest", () => {
 
     expect(leaves).toMatchObject([{ status: "conflict", conflictsWith: "i-nk-de-cutoff-new", conflictClaims: { said: "the 20th", noted: "the 18th" } }]);
     expect(leavesForNode("nk-de-gmbh")).toMatchObject([{ status: "conflict" }]);
+  });
+
+  it("the tree counts the open conflict on the node and its category, so it can show it in red", async () => {
+    await ingest(lena(), callInput, { model: fakeModel([call20], demoJudge).client });
+    const counts = leafCounts("nike", new Date());
+    expect(counts["nk-de-gmbh"]).toMatchObject({ conflicts: 1, categoryConflicts: { payroll: 1 } });
+    expect(counts["nk-de"]).toMatchObject({ conflicts: 0 });
   });
 });
 
