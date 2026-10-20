@@ -33,7 +33,8 @@ describe("ending the demo call with Katrin (scene 1)", () => {
     const { leaves } = await ingestDemoCall(lena(), { model: down });
     expect(leaves.map((l) => l.type).sort()).toEqual(["attention", "change", "expertise"]);
     for (const l of leaves) {
-      expect(l).toMatchObject({ nodeId: "nk-de-gmbh", category: "payroll", status: "auto", source: { channel: "call", trigger: "auto", byId: "lena", from: "Katrin Vogel" } });
+      // The cutoff change contradicts Jonas's note, so it is a conflict (ticket #8); the others hang as usual.
+      expect(l).toMatchObject({ nodeId: "nk-de-gmbh", category: "payroll", status: l.type === "change" ? "conflict" : "auto", source: { channel: "call", trigger: "auto", byId: "lena", from: "Katrin Vogel" } });
       expect(transcript.toLowerCase()).toContain(l.quote.toLowerCase());
     }
     expect(leaves.find((l) => l.type === "change")!.statement).toMatch(/20th/);

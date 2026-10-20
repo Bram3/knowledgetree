@@ -2,6 +2,7 @@ import { companyNodes, companyCategories, detectNode, nodePath, uid, categoryFor
 import { OTHER_CATEGORY } from "./catalog";
 import { addLeaves, leavesFromSource } from "./leaves";
 import { assertNodeAccess } from "./access";
+import { compareLeaves, recordCompare, leavesReconfirmedBy } from "./compare";
 import { generate, cacheKeyFor, type ModelClient } from "./gemini";
 import { LEAF_TYPES, type Channel, type Leaf, type LeafType, type Person, type Trigger } from "./types";
 
@@ -20,7 +21,11 @@ export type IngestInput = {
 
 export type IngestDeps = { model?: ModelClient; now?: () => Date };
 
-export type IngestResult = { leaves: Leaf[]; companyId: string | null };
+/**
+ * `leaves`: new leaves stored for this message (status "conflict" when one contradicts a note).
+ * `reconfirmed`: existing leaves this message said again (their reconfirmedAt grew, no new leaf was made).
+ */
+export type IngestResult = { leaves: Leaf[]; reconfirmed: Leaf[]; companyId: string | null };
 
 /** Longest text one ingest call accepts (a long mail thread or a few minutes of call transcript). */
 export const MAX_INGEST_CHARS = 20_000;
@@ -63,7 +68,7 @@ export async function ingest(user: Person, input: IngestInput, deps: IngestDeps 
   if (input.text.length > MAX_INGEST_CHARS) throw new IngestRejectedError(`Text longer than ${MAX_INGEST_CHARS} characters`);
   // Pre-filter: which customer is this about? Only customers the user is assigned to are considered.
   const hit = input.nodeId ? { node: assertNodeAccess(user, input.nodeId), confidence: 1 } : detectNode(`${input.from ?? ""}\n${text}`, user.customerIds);
-  if (!hit) return { leaves: [], companyId: null };
+  if (!hit) return { leaves: [], reconfirmed: [], companyId: null };
   const companyId = hit.node.companyId;
   const nodes = companyNodes(companyId);
   const categories = companyCategories(companyId).map((c) => c.id);
@@ -71,13 +76,14 @@ export async function ingest(user: Person, input: IngestInput, deps: IngestDeps 
 
   // A channel may hand us the same message again (re-opened mail): return what it already grew.
   const existing = leavesFromSource(input.channel, input.ref).filter((l) => nodeIds.has(l.nodeId));
-  if (existing.length) return { leaves: existing, companyId };
+  const heard = leavesReconfirmedBy(input.channel, input.ref).filter((l) => nodeIds.has(l.nodeId));
+  if (existing.length || heard.length) return { leaves: existing, reconfirmed: heard, companyId };
 
   const res = await generate(
     { system: SYSTEM, parts: [{ text: prompt(text, nodes.map((n) => ({ id: n.id, path: nodePath(n.id).map((p) => p.name).join(" › ") }))) }], schema: schema(nodes.map((n) => n.id), categories) },
     { cacheKey: cacheKeyFor("leaves", text), client: deps.model },
   );
-  if (!res) return { leaves: [], companyId };
+  if (!res) return { leaves: [], reconfirmed: [], companyId };
   const raw = parseLeaves(res.text)
     .filter((r) => r.confidence >= MIN_CONFIDENCE[input.trigger])
     .filter((r) => quoteIsLiteral(r.quote, text))
@@ -109,10 +115,11 @@ export async function ingest(user: Person, input: IngestInput, deps: IngestDeps 
     reconfirmedAt: [],
     usefulCount: 0,
   }));
-  // COMPARE (ticket #8) belongs here: match `leaves` against existing leaves/notes on their node
-  // to turn them into reconfirmations (reconfirmedAt) or conflicts before they are stored.
-  addLeaves(leaves);
-  return { leaves, companyId };
+  // COMPARE: against the notes and leaves on the same node › category → new, reconfirmation (×n) or conflict.
+  const outcome = await compareLeaves(leaves, deps.model);
+  addLeaves(outcome.fresh);
+  const reconfirmed = recordCompare(user, outcome);
+  return { leaves: outcome.fresh, reconfirmed, companyId };
 }
 
 /** Rule-based placement (detectNode) is trusted as a fallback from this confidence on (entity level). */

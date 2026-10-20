@@ -30,7 +30,7 @@ export async function ingestAudio(user: Person, input: AudioIngestInput, deps: I
   const { audio, fallbackTranscript, ...rest } = input;
   const t = await transcribe(audio, deps);
   const text = t?.text.trim() ? t.text : fallbackTranscript;
-  if (!text?.trim()) return { leaves: [], companyId: null, transcriptFrom: "none" };
+  if (!text?.trim()) return { leaves: [], reconfirmed: [], companyId: null, transcriptFrom: "none" };
   const res = await ingest(user, { ...rest, text }, deps);
   return { ...res, transcriptFrom: t?.text.trim() ? t.from : "fallback" };
 }

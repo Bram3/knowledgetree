@@ -115,7 +115,7 @@ describe("guards", () => {
   it("a user can't ingest into a customer they have no access to: nothing is extracted or stored", async () => {
     const { client, calls } = fakeModel({ leaves: [cutoffLeaf] });
     const result = await ingest(person("amelie")!, mail(NIKE_DE_MAIL), { model: client });
-    expect(result).toEqual({ leaves: [], companyId: null });
+    expect(result).toEqual({ leaves: [], reconfirmed: [], companyId: null });
     expect(calls).toHaveLength(0);
     expect(leavesForNode("nk-de-gmbh")).toEqual([]);
   });
@@ -185,10 +185,11 @@ describe("idempotency", () => {
   it("ingesting the same message twice does not duplicate leaves or call the model again", async () => {
     const { client, calls } = fakeModel({ leaves: [cutoffLeaf] });
     const first = await ingest(lena(), mail(NIKE_DE_MAIL, "outlook:e1"), { model: client });
+    const callsAfterFirst = calls.length;
     const again = await ingest(lena(), mail(NIKE_DE_MAIL, "outlook:e1"), { model: client });
     expect(again.leaves.map((l) => l.id)).toEqual(first.leaves.map((l) => l.id));
     expect(leavesForNode("nk-de-gmbh")).toHaveLength(1);
-    expect(calls).toHaveLength(1);
+    expect(calls).toHaveLength(callsAfterFirst);
   });
 });
 
@@ -214,7 +215,7 @@ describe("when Vertex is unreachable", () => {
   });
 
   it("without a cached response nothing is stored and nothing throws", async () => {
-    expect(await ingest(lena(), mail(`${NIKE_DE_MAIL}\nnever seen before`), { model: down })).toEqual({ leaves: [], companyId: "nike" });
+    expect(await ingest(lena(), mail(`${NIKE_DE_MAIL}\nnever seen before`), { model: down })).toEqual({ leaves: [], reconfirmed: [], companyId: "nike" });
   });
 
   describe("the demo mails still work from the committed cache", () => {

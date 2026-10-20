@@ -1,14 +1,14 @@
 import Link from "next/link";
-import { FilePlus2, ShieldCheck, Archive, Upload, GitBranchPlus, MessageSquare, Mail, Pencil, UserRoundCheck } from "lucide-react";
+import { FilePlus2, ShieldCheck, Archive, Upload, GitBranchPlus, MessageSquare, Mail, Pencil, TriangleAlert, Leaf, Undo2, Inbox, UserRoundCheck } from "lucide-react";
 import type { Activity } from "@/lib/types";
 import { Avatar, personName } from "./Avatar";
 import { timeAgo } from "@/lib/format";
 
 const icons = {
-  created: FilePlus2, updated: Pencil, verified: ShieldCheck, superseded: Archive, new_version: Upload, node_added: GitBranchPlus, captured_teams: MessageSquare, captured_outlook: Mail, handed_over: UserRoundCheck,
+  created: FilePlus2, updated: Pencil, verified: ShieldCheck, superseded: Archive, new_version: Upload, node_added: GitBranchPlus, captured_teams: MessageSquare, captured_outlook: Mail, leaf_conflict: TriangleAlert, leaf_reconfirmed: Leaf, leaf_kept: Undo2, leaf_deferred: Inbox, handed_over: UserRoundCheck,
 };
 const colors = {
-  created: "bg-sd-navy/10 text-sd-navy", updated: "bg-slate-100 text-slate-600", verified: "bg-emerald-100 text-emerald-700", superseded: "bg-rose-100 text-rose-700", new_version: "bg-sky-100 text-sky-700", node_added: "bg-violet-100 text-violet-700", captured_teams: "bg-indigo-100 text-indigo-700", captured_outlook: "bg-blue-100 text-blue-700", handed_over: "bg-amber-100 text-amber-800",
+  created: "bg-sd-navy/10 text-sd-navy", updated: "bg-slate-100 text-slate-600", verified: "bg-emerald-100 text-emerald-700", superseded: "bg-rose-100 text-rose-700", new_version: "bg-sky-100 text-sky-700", node_added: "bg-violet-100 text-violet-700", captured_teams: "bg-indigo-100 text-indigo-700", captured_outlook: "bg-blue-100 text-blue-700", leaf_conflict: "bg-red-100 text-red-700", leaf_reconfirmed: "bg-emerald-100 text-emerald-700", leaf_kept: "bg-stone-100 text-stone-600", leaf_deferred: "bg-amber-100 text-amber-700", handed_over: "bg-amber-100 text-amber-800",
 };
 
 export type FeedItem = Activity & { companyName?: string; nodeName?: string };
