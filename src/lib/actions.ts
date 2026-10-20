@@ -61,8 +61,8 @@ type FileInput = { nodeId: string; title: string; fileName: string; fileSize?: s
 
 /** Link an existing file (seeded/mailbox document or an earlier upload) as a new item. URLs are checked by assertLinkableFile. */
 export async function addFile(input: FileInput) {
-  const { user: u } = await requireCustomerAccess(input.nodeId);
-  for (const url of [input.fileUrl, input.previewUrl]) if (url) assertLinkableFile(u, url);
+  const { user: u, node } = await requireCustomerAccess(input.nodeId);
+  for (const url of [input.fileUrl, input.previewUrl]) if (url) assertLinkableFile(u, url, node.companyId);
   return createFileItem(u, input);
 }
 

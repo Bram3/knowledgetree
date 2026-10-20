@@ -118,6 +118,21 @@ describe("linking existing files with addFile", () => {
     await expect(link("/files/../db.json")).rejects.toBeInstanceOf(AccessDeniedError);
   });
 
+  it("can't file another customer's mailbox attachment that nobody has filed yet", async () => {
+    await expect(link("/files/Nike_DE_Payroll_Calendar_Q4_2026.xlsx")).rejects.toBeInstanceOf(AccessDeniedError);
+    await expect(link("/files/ok.pdf", "/files/att-nike-de-calendar.pdf")).rejects.toBeInstanceOf(AccessDeniedError);
+    await expect(link("/files/att-nike-de-calendar.pdf")).rejects.toBeInstanceOf(AccessDeniedError);
+    expect((await fetchSeed("att-nike-de-calendar.pdf")).status).toBe(404);
+    expect((await fetchSeed("Nike_DE_Payroll_Calendar_Q4_2026.xlsx")).status).toBe(404);
+  });
+
+  it("can't move a document to another customer, even with access to both", async () => {
+    await signInAs("tom");
+    const onVrt = (fileUrl: string) => addFile({ nodeId: "vrt", title: "t", fileName: "x.pdf", fileUrl, content: "", topic: "", scope: [] });
+    await expect(onVrt("/files/Nike_EMEA_MSA_2024_signed.pdf")).rejects.toBeInstanceOf(AccessDeniedError);
+    await expect(onVrt("/files/Nike_DE_Payroll_Calendar_Q4_2026.xlsx")).rejects.toBeInstanceOf(AccessDeniedError);
+  });
+
   it("can file a mailbox attachment nobody has filed yet (Outlook capture)", async () => {
     await signInAs("tom");
     await expect(addFile({ nodeId: "nk-de", title: "t", fileName: "Nike_DE_Payroll_Calendar_Q4_2026.xlsx", fileUrl: "/files/Nike_DE_Payroll_Calendar_Q4_2026.xlsx", previewUrl: "/files/att-nike-de-calendar.pdf", content: "", topic: "", scope: [] })).resolves.toEqual(expect.any(String));
