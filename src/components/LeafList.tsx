@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Mail, MessageSquare, Phone, Globe, Mic } from "lucide-react";
 import type { Channel, Leaf, LeafType } from "@/lib/types";
 import { personName } from "./Avatar";
@@ -30,6 +31,12 @@ export const SEASON_META: Record<Season, { label: string; color: string; border:
   fallen: { label: "Fallen", color: "#78716c", border: "border-stone-300" },
 };
 
+/** Link back to the message a leaf came from, for channels whose mock can show it (Teams: `teams:<message id>`). */
+function sourceHref(leaf: Leaf) {
+  const m = /^teams:([\w-]+)$/.exec(leaf.source.ref);
+  return leaf.source.channel === "teams" && m ? `/teams#${m[1]}` : null;
+}
+
 export function LeafTypeBadge({ type }: { type: LeafType }) {
   const m = LEAF_TYPE_META[type];
   return <span className="inline-flex items-center gap-1 rounded-[4px] px-1.5 py-0.5 text-[10.5px] font-semibold" style={{ background: `${m.color}14`, color: m.color }}>{m.icon} {m.label}</span>;
@@ -53,7 +60,9 @@ export function LeafCard({ leaf }: { leaf: Leaf | FreshLeaf }) {
       {leaf.why && <div className="mt-0.5 text-[12px] text-sd-muted">Why: {leaf.why}</div>}
       <blockquote className="mt-2 border-l-2 border-emerald-300 pl-2 text-[12px] italic text-sd-text">“{leaf.quote}”</blockquote>
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-sd-muted">
-        <span className="inline-flex items-center gap-1"><ch.Icon className="h-3 w-3" /> {ch.label}{leaf.source.trigger === "reaction" ? " · 🍃 reaction" : ""}</span>
+        {sourceHref(leaf)
+          ? <Link href={sourceHref(leaf)!} className="inline-flex items-center gap-1 underline decoration-dotted hover:text-sd-primary" title="Open the message this leaf came from"><ch.Icon className="h-3 w-3" /> {ch.label}{leaf.source.trigger === "reaction" ? " · 🍃 reaction" : ""}</Link>
+          : <span className="inline-flex items-center gap-1"><ch.Icon className="h-3 w-3" /> {ch.label}{leaf.source.trigger === "reaction" ? " · 🍃 reaction" : ""}</span>}
         <span>· {fmtDate(leaf.source.at)}</span>
         {leaf.source.from && <span>· said by {leaf.source.from.replace(/\s*<.*>$/, "")}</span>}
         <span>· caught for {personName(leaf.source.byId)}</span>
