@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Shell } from "@/components/Shell";
 import { getCurrentUser } from "@/lib/auth";
+import { monthsAhead } from "@/lib/clock";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 
@@ -13,13 +14,14 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const user = await getCurrentUser();
+  const simMonths = await monthsAhead();
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <head>
         <link rel="stylesheet" href="https://cdn.sdworx.com/ignite/assets/v2/fonts/all.css" />
       </head>
       <body className="min-h-full">
-        <Shell user={user ? { id: user.id, name: user.name, role: user.role, customers: user.customerIds.length } : null}>{children}</Shell>
+        <Shell user={user ? { id: user.id, name: user.name, role: user.role, customers: user.customerIds.length } : null} simMonths={simMonths}>{children}</Shell>
       </body>
     </html>
   );

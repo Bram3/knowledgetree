@@ -3,6 +3,8 @@ import { Mail, MessageSquare, Phone, Globe, Mic } from "lucide-react";
 import type { Channel, Leaf, LeafType } from "@/lib/types";
 import { personName } from "./Avatar";
 import { fmtDate } from "@/lib/format";
+import type { FreshLeaf, Season } from "@/lib/freshness";
+import { UsefulButton } from "./UsefulButton";
 
 export const LEAF_TYPE_META: Record<LeafType, { label: string; icon: string; color: string }> = {
   attention: { label: "Attention point", icon: "⚠️", color: "#b45309" },
@@ -21,6 +23,14 @@ const CHANNEL_META: Record<Channel, { label: string; Icon: typeof Mail }> = {
   voice: { label: "Voice note", Icon: Mic },
 };
 
+/** Leaf colours by freshness: green, then yellow, then brown; fallen leaves go to the archive. */
+export const SEASON_META: Record<Season, { label: string; color: string; border: string }> = {
+  green: { label: "Fresh", color: "#059669", border: "border-emerald-200" },
+  yellow: { label: "Fading", color: "#ca8a04", border: "border-yellow-300" },
+  brown: { label: "Withering", color: "#92400e", border: "border-amber-700/40" },
+  fallen: { label: "Fallen", color: "#78716c", border: "border-stone-300" },
+};
+
 /** Link back to the message a leaf came from, for channels whose mock can show it (Teams: `teams:<message id>`). */
 function sourceHref(leaf: Leaf) {
   const m = /^teams:([\w-]+)$/.exec(leaf.source.ref);
@@ -33,10 +43,14 @@ export function LeafTypeBadge({ type }: { type: LeafType }) {
 }
 
 /** One leaf: statement, why, the literal quote, where and when it was caught, who said it, and how sure we are. */
-export function LeafCard({ leaf }: { leaf: Leaf }) {
+/** With freshness (a FreshLeaf) the card is coloured by season and offers the "Useful" button. */
+export function LeafCard({ leaf }: { leaf: Leaf | FreshLeaf }) {
   const ch = CHANNEL_META[leaf.source.channel];
+  const fresh = "freshness" in leaf ? leaf : null;
+  const s = fresh ? SEASON_META[fresh.season] : null;
+  const border = leaf.status === "seed" ? "border-dashed border-amber-300" : s?.border ?? "border-emerald-200";
   return (
-    <div className={`fade-up rounded-[8px] border bg-white p-3 ${leaf.status === "seed" ? "border-dashed border-amber-300" : "border-emerald-200"}`}>
+    <div className={`fade-up rounded-[8px] border bg-white p-3 ${border} ${fresh?.season === "fallen" ? "opacity-70" : ""}`} style={s ? { borderLeftWidth: 4, borderLeftColor: s.color } : undefined}>
       <div className="flex flex-wrap items-center gap-1.5">
         <LeafTypeBadge type={leaf.type} />
         {leaf.status === "seed" && <span className="text-[10.5px] font-medium text-amber-700">🌱 seed, waiting for a place</span>}
@@ -53,6 +67,15 @@ export function LeafCard({ leaf }: { leaf: Leaf }) {
         {leaf.source.from && <span>· said by {leaf.source.from.replace(/\s*<.*>$/, "")}</span>}
         <span>· caught for {personName(leaf.source.byId)}</span>
       </div>
+      {fresh && s && (
+        <div className="mt-2 flex items-center gap-2">
+          <span className="h-1.5 w-16 overflow-hidden rounded-full bg-sd-subtle" title={`Freshness ${Math.round(fresh.freshness * 100)}%`}>
+            <span className="block h-full rounded-full" style={{ width: `${Math.round(fresh.freshness * 100)}%`, background: s.color }} />
+          </span>
+          <span className="text-[10.5px] font-medium" style={{ color: s.color }}>{s.label} · {Math.round(fresh.freshness * 100)}%</span>
+          <span className="ml-auto"><UsefulButton leafId={leaf.id} count={leaf.usefulCount} /></span>
+        </div>
+      )}
     </div>
   );
 }
