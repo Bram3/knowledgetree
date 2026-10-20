@@ -3,7 +3,9 @@ import Link from "next/link";
 import { ChevronRight, Lock } from "lucide-react";
 import { requireUser, canAccess } from "@/lib/auth";
 import { company, companyNodes, companySummary, nodeStats, inheritedItems, itemsForNode, nodePath, node as getNode, nodeCountry, recentActivity, getDb, person, companyCategories } from "@/lib/db";
-import { leafCounts, leavesForNode, isLive } from "@/lib/leaves";
+import { leafCounts, currentLeaves, archivedLeaves } from "@/lib/leaves";
+import { withFreshness } from "@/lib/freshness";
+import { now } from "@/lib/clock";
 import { OrgChart } from "@/components/OrgChart";
 import { NodePanel, type PanelData } from "@/components/NodePanel";
 import { AddNodeButton } from "@/components/AddNodeButton";
@@ -35,7 +37,8 @@ export default async function CustomerPage({ params, searchParams }: PageProps<"
   const categories = companyCategories(id);
   const selectedCat = sp.cat && categories.some((c) => c.id === sp.cat) ? sp.cat : undefined;
   const db = getDb();
-  const leaves = leafCounts(id);
+  const at = await now(); // simulated date from the time slider
+  const leaves = leafCounts(id, at);
   const customerDocsByCategory = Object.fromEntries(nodes.map((n) => [n.id, Object.fromEntries(categories.map((c) => [c.id, itemsForNode(n.id).filter((i) => i.status === "active" && i.category === c.id && i.origin === "customer").length]))]));
 
   const panel: PanelData = {
@@ -50,7 +53,8 @@ export default async function CustomerPage({ params, searchParams }: PageProps<"
     highlightItem: sp.item,
     currentUserId: user.id,
     initialCategory: selectedCat,
-    leaves: leavesForNode(selectedId).filter(isLive),
+    leaves: currentLeaves(selectedId, at).map((l) => withFreshness(l, at)),
+    fallenLeaves: archivedLeaves(selectedId, at).map((l) => withFreshness(l, at)),
   };
 
   return (
