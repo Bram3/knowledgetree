@@ -4,7 +4,7 @@ import { assertItemAccess, assertNodeAccess, AccessDeniedError } from "./access"
 import { canAccess } from "./auth";
 import { generate, cacheKeyFor, type ModelClient } from "./gemini";
 import { COMPARE_SYSTEM, COMPARE_SCHEMA, compareText, correctedNote, describeLeaf, describeNote } from "./compare-prompt";
-import type { ActivityAction, Db, Leaf, LeafSource, Person } from "./types";
+import type { ActivityAction, Db, Item, Leaf, LeafSource, Person } from "./types";
 
 /**
  * COMPARE (step 5 of the pipeline) and the owner's one-tap answer to a conflict.
@@ -23,11 +23,15 @@ type Judgement = { relation: Relation; said: string | null; noted: string | null
 export type CompareOutcome = {
   fresh: Leaf[]; // leaves to store (status "conflict" when they contradict a note)
   reconfirm: { leafId: string; source: LeafSource }[]; // existing leaves heard again
+  reconfirmNotes: { itemId: string; source: LeafSource }[]; // notes heard again
 };
+
+/** A note that a message said again: no leaf is made, the note records the source. */
+export type ReconfirmedNote = { id: string; title: string; nodeId: string; times: number };
 
 /** Compares freshly extracted leaves with what already hangs on their node › category. Does not write. */
 export async function compareLeaves(leaves: Leaf[], model?: ModelClient): Promise<CompareOutcome> {
-  const out: CompareOutcome = { fresh: [], reconfirm: [] };
+  const out: CompareOutcome = { fresh: [], reconfirm: [], reconfirmNotes: [] };
   const db = getDb();
   for (const leaf of leaves) {
     if (leaf.status !== "auto") {
@@ -45,6 +49,11 @@ export async function compareLeaves(leaves: Leaf[], model?: ModelClient): Promis
       out.reconfirm.push({ leafId: same.id, source: leaf.source });
       continue;
     }
+    const sameNote = notes.find((_, i) => onNotes[i].relation === "same");
+    if (sameNote) {
+      if (!out.reconfirmNotes.some((r) => r.itemId === sameNote.id)) out.reconfirmNotes.push({ itemId: sameNote.id, source: leaf.source });
+      continue;
+    }
     const hit = notes.findIndex((_, i) => onNotes[i].relation === "contradicts");
     if (hit >= 0) {
       const note = notes[hit];
@@ -59,9 +68,17 @@ export async function compareLeaves(leaves: Leaf[], model?: ModelClient): Promis
 }
 
 /** Writes the side effects of a comparison (after the fresh leaves are stored): reconfirmations and the Changes feed. */
-export function recordCompare(user: Person, outcome: CompareOutcome): Leaf[] {
+export function recordCompare(user: Person, outcome: CompareOutcome): { reconfirmed: Leaf[]; reconfirmedNotes: ReconfirmedNote[] } {
   const reconfirmed: Leaf[] = [];
+  const reconfirmedNotes: ReconfirmedNote[] = [];
   saveDb((db) => {
+    for (const r of outcome.reconfirmNotes) {
+      const it = db.items.find((i) => i.id === r.itemId);
+      if (!it) continue;
+      (it.reconfirmedBy ??= []).push(r.source);
+      log(db, "leaf_reconfirmed", it.nodeId, user.id, `heard again from ${saidBy(r.source)} (${r.source.channel}): "${it.title}" ×${it.reconfirmedBy.length + 1}`, it.id);
+      reconfirmedNotes.push(noteRef(it));
+    }
     for (const r of outcome.reconfirm) {
       const l = db.leaves.find((x) => x.id === r.leafId);
       if (!l) continue;
@@ -77,12 +94,20 @@ export function recordCompare(user: Person, outcome: CompareOutcome): Leaf[] {
       log(db, "leaf_conflict", l.nodeId, user.id, `caught a ${l.source.channel} from ${saidBy(l.source)} that conflicts with "${note?.title}": ${l.conflictClaims?.said} vs ${l.conflictClaims?.noted}.${owner ? ` Asked ${owner.name}.` : ""}`, note?.id, l.id);
     }
   });
-  return reconfirmed;
+  return { reconfirmed, reconfirmedNotes };
 }
+
+const fromSource = (channel: LeafSource["channel"], ref: string) => (s: LeafSource) => s.channel === channel && s.ref === ref;
+const noteRef = (it: Item): ReconfirmedNote => ({ id: it.id, title: it.title, nodeId: it.nodeId, times: (it.reconfirmedBy?.length ?? 0) + 1 });
 
 /** Leaves that reconfirmed an existing leaf from this message, so re-ingesting it changes nothing. */
 export function leavesReconfirmedBy(channel: LeafSource["channel"], ref: string): Leaf[] {
-  return getDb().leaves.filter((l) => l.reconfirmedBy?.some((s) => s.channel === channel && s.ref === ref));
+  return getDb().leaves.filter((l) => l.reconfirmedBy?.some(fromSource(channel, ref)));
+}
+
+/** Notes this message said again, so re-ingesting it changes nothing. */
+export function notesReconfirmedBy(channel: LeafSource["channel"], ref: string): ReconfirmedNote[] {
+  return getDb().items.filter((i) => i.reconfirmedBy?.some(fromSource(channel, ref))).map(noteRef);
 }
 
 // ---------- the owner's card ----------

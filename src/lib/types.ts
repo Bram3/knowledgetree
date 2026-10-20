@@ -68,6 +68,7 @@ export type Item = {
   status: "active" | "superseded";
   supersededById?: string;
   confirmsId?: string; // this item corroborates another item
+  reconfirmedBy?: LeafSource[]; // calls/mails/messages that said the same as this note (COMPARE "same"), no leaf made
   source: { type: "portal" | "teams" | "outlook"; ref: string };
 };
 

@@ -7,18 +7,18 @@ import { ingest, validateIngestInput, type IngestResult } from "./ingest";
 import { ingestDemoCall } from "./demo-call";
 import { getLeaf, removeLeaves } from "./leaves";
 import { AccessDeniedError, assertNodeAccess } from "./access";
-import { conflictCardsFor, resolveConflict, CONFLICT_CHOICES, type ConflictCard, type ConflictChoice } from "./compare";
+import { conflictCardsFor, resolveConflict, CONFLICT_CHOICES, type ConflictCard, type ConflictChoice, type ReconfirmedNote } from "./compare";
 import type { Leaf, Person } from "./types";
 
 export type IngestedLeaf = Leaf & { path: string[] };
 
-export type Ingested = { leaves: IngestedLeaf[]; reconfirmed: IngestedLeaf[]; companyId: string | null };
+export type Ingested = { leaves: IngestedLeaf[]; reconfirmed: IngestedLeaf[]; reconfirmedNotes: ReconfirmedNote[]; companyId: string | null };
 
-/** New leaves plus the known leaves this message reconfirmed (×n), each with its node path for display. */
+/** New leaves plus the known leaves and notes this message reconfirmed (×n), each leaf with its node path for display. */
 function withPaths(res: IngestResult): Ingested {
-  if (res.leaves.length || res.reconfirmed.length) revalidatePath("/", "layout");
+  if (res.leaves.length || res.reconfirmed.length || res.reconfirmedNotes.length) revalidatePath("/", "layout");
   const withPath = (l: Leaf) => ({ ...l, path: nodePath(l.nodeId).map((n) => n.name) });
-  return { companyId: res.companyId, leaves: res.leaves.map(withPath), reconfirmed: res.reconfirmed.map(withPath) };
+  return { companyId: res.companyId, leaves: res.leaves.map(withPath), reconfirmed: res.reconfirmed.map(withPath), reconfirmedNotes: res.reconfirmedNotes };
 }
 
 /**

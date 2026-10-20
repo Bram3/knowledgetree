@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 import { Mail, Inbox, Send, FileText, Archive, Trash2, Search, Reply, Forward, MoreHorizontal, Paperclip, ChevronRight, Check, ExternalLink, StickyNote, Star } from "lucide-react";
 import { suggestNode, nodeSummary, addFile } from "@/lib/actions";
-import { ingestText, type IngestedLeaf } from "@/lib/leaf-actions";
+import { ingestText, type Ingested } from "@/lib/leaf-actions";
 import { DEMO_MAILS, mailIngestInput, type DemoMail } from "@/lib/demo-mails";
 import { LeafTypeBadge } from "./LeafList";
 
@@ -60,7 +60,7 @@ export function OutlookMock() {
 function AddInPane({ sel }: { sel: DemoMail }) {
   const [suggest, setSuggest] = useState<Awaited<ReturnType<typeof suggestNode>>>(null);
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof nodeSummary>> | null>(null);
-  const [caught, setCaught] = useState<{ leaves: IngestedLeaf[]; reconfirmed: IngestedLeaf[]; companyId: string | null } | "error" | null>(null);
+  const [caught, setCaught] = useState<Ingested | "error" | null>(null);
   const [filed, setFiled] = useState(false);
   const [pending, start] = useTransition();
 
@@ -101,7 +101,7 @@ function AddInPane({ sel }: { sel: DemoMail }) {
               <div className="mt-1.5 text-[12.5px] text-slate-400">Looking for leaves…</div>
             ) : caught === "error" ? (
               <div className="mt-1.5 text-[12.5px] text-slate-400">Could not read this email right now.</div>
-            ) : caught.leaves.length === 0 && caught.reconfirmed.length === 0 ? (
+            ) : caught.leaves.length === 0 && caught.reconfirmed.length === 0 && caught.reconfirmedNotes.length === 0 ? (
               <div className="fade-up mt-1.5 rounded-lg border border-dashed border-sd-border bg-white px-3 py-2.5 text-[12px] text-slate-500">Nothing worth keeping in this email. No leaves.</div>
             ) : (
               <div className="fade-up mt-1.5 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-[12px] text-emerald-900">
@@ -122,8 +122,13 @@ function AddInPane({ sel }: { sel: DemoMail }) {
                       <div className="mt-1 text-[11px] text-slate-500">{l.path.join(" › ")} · {Math.round(l.confidence * 100)}%</div>
                     </li>
                   ))}
+                  {caught.reconfirmedNotes.map((n) => (
+                    <li key={n.id} className="rounded-md bg-white p-2 ring-1 ring-emerald-100">
+                      <div className="text-[12px] leading-snug text-sd-text">Confirms the note “{n.title}” <span className="rounded-full bg-emerald-600 px-1.5 text-[10.5px] font-bold text-white">×{n.times}</span></div>
+                    </li>
+                  ))}
                 </ul>
-                {caught.companyId && <Link href={`/customers/${caught.companyId}?node=${(caught.leaves[0] ?? caught.reconfirmed[0]).nodeId}`} className="mt-2 inline-flex items-center gap-1 font-medium text-emerald-800 underline">Open in KnowledgeTree <ExternalLink className="h-3 w-3" /></Link>}
+                {caught.companyId && <Link href={`/customers/${caught.companyId}?node=${(caught.leaves[0] ?? caught.reconfirmed[0] ?? caught.reconfirmedNotes[0]).nodeId}`} className="mt-2 inline-flex items-center gap-1 font-medium text-emerald-800 underline">Open in KnowledgeTree <ExternalLink className="h-3 w-3" /></Link>}
               </div>
             )}
           </div>

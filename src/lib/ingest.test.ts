@@ -115,7 +115,7 @@ describe("guards", () => {
   it("a user can't ingest into a customer they have no access to: nothing is extracted or stored", async () => {
     const { client, calls } = fakeModel({ leaves: [cutoffLeaf] });
     const result = await ingest(person("amelie")!, mail(NIKE_DE_MAIL), { model: client });
-    expect(result).toEqual({ leaves: [], reconfirmed: [], companyId: null });
+    expect(result).toEqual({ leaves: [], reconfirmed: [], reconfirmedNotes: [], companyId: null });
     expect(calls).toHaveLength(0);
     expect(leavesForNode("nk-de-gmbh")).toEqual([]);
   });
@@ -215,7 +215,7 @@ describe("when Vertex is unreachable", () => {
   });
 
   it("without a cached response nothing is stored and nothing throws", async () => {
-    expect(await ingest(lena(), mail(`${NIKE_DE_MAIL}\nnever seen before`), { model: down })).toEqual({ leaves: [], reconfirmed: [], companyId: "nike" });
+    expect(await ingest(lena(), mail(`${NIKE_DE_MAIL}\nnever seen before`), { model: down })).toEqual({ leaves: [], reconfirmed: [], reconfirmedNotes: [], companyId: "nike" });
   });
 
   describe("the demo mails still work from the committed cache", () => {
