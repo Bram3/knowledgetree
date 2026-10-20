@@ -33,17 +33,17 @@ async function demoThought() {
 }
 
 describe("scene 2b: second thought on the draft to sarah@nike.fr", () => {
-  it("the demo draft shows the card from the committed cache: the leaf, its source and ×5", async () => {
-    expect(await demoThought()).toMatchObject({ leafId: "sl-fr-1", path: ["Nike EMEA", "France"], said: "the 15th", noted: "the 20th", times: 5, source: { channel: "mail", from: "Julien Moreau" } });
+  it("the demo draft shows the card from the committed cache: the leaf, its source and ×4", async () => {
+    expect(await demoThought()).toMatchObject({ leafId: "sl-fr-1", path: ["Nike EMEA", "France"], said: "the 15th", noted: "the 20th", times: 4, source: { channel: "mail", from: "Julien Moreau" } });
   });
 
-  it("Change to 20th reconfirms the leaf (×6), once per mail, with names in the Changes feed", async () => {
+  it("Change to 20th reconfirms the leaf (×5), once per mail, with names in the Changes feed", async () => {
     const t = await demoThought();
     await answer(t, "change");
     await answer(t, "change");
-    expect(getLeaf("sl-fr-1")!.reconfirmedAt).toHaveLength(5);
+    expect(getLeaf("sl-fr-1")!.reconfirmedAt).toHaveLength(4);
     expect(feed()).toMatchObject([{ action: "leaf_reconfirmed", actorId: "lena", summary: expect.stringContaining("sarah@nike.fr") }]);
-    expect(feed()[0].summary).toContain("×6");
+    expect(feed()[0].summary).toContain("×5");
   });
 
   it("15th is correct makes a new leaf from the draft sentence, the old leaf turns brown, and Sofie (branch owner) gets one question", async () => {

@@ -11,7 +11,7 @@ import type { Leaf, LeafType, Channel } from "./types";
  * The demo adds 4 of Lena's (3 from the call, 1 from the 🍃 in Teams), so when scene 5 starts Jonas carries
  * 18 of 29 = 62% of what we know about Nike Germany, and Lena is the suggested successor.
  * Nothing seeded hangs on Nike Deutschland GmbH › Payroll, so the call, the conflict and the ×2 start clean.
- * France has one leaf, reconfirmed 4 times: the cutoff is the 20th (scene 2b, Lena's draft to Sarah says the 15th).
+ * France has one leaf, confirmed 4 times (3 reconfirmations): the cutoff is the 20th (scene 2b, Lena's draft to Sarah says the 15th).
  * Belgium gets a few of Sofie's leaves so the rest of the tree has leaves too (fewer than Jonas has in Germany).
  */
 
@@ -57,12 +57,11 @@ const raw: L[] = [
   { id: "sl-be-3", by: "sofie", daysAgo: 80, nodeId: "nk-be-retail", channel: "mail", from: BART, type: "decision", category: "hr-admin", statement: "Meal vouchers at Nike Retail Belgium stay at 8 euro in 2027.", why: "Agreed in the 2026 negotiation with the unions.", quote: "meal vouchers stay at 8 euro next year", people: ["Bart Claes"] },
   { id: "sl-be-4", by: "sofie", daysAgo: 18, nodeId: "nk-be-elc", channel: "teams", from: "Sofie De Smet", type: "risk", category: "hr-admin", statement: "Peak season temp workers at ELC Laakdal are often declared late in Dimona.", quote: "the peak season temps are often late in Dimona" },
   // ---- France (scene 2b, second thought): the finance contact's mail of early March (231 days before the
-  // recording day, 20 October), said again 4 times since by other people, so it doesn't weigh on the knowledge risk.
+  // recording day, 20 October), said again 3 times since by other people (×4), so it doesn't weigh on the knowledge risk.
   { id: "sl-fr-1", by: "sofie", daysAgo: 231, nodeId: "nk-fr", channel: "mail", from: JULIEN, type: "decision", category: "payroll", statement: "Cutoff date for Nike France is the 20th.", quote: "the cutoff date for Nike France is the 20th of the month", people: ["Julien Moreau"],
     heard: [
       { daysAgo: 170, by: "marta", channel: "call", from: JULIEN },
       { daysAgo: 110, by: "lena", channel: "mail", from: SARAH },
-      { daysAgo: 52, by: "tom", channel: "teams", from: "Marta Kowalski" },
       { daysAgo: 9, by: "lena", channel: "mail", from: SARAH },
     ] },
 ];

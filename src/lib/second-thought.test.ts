@@ -47,7 +47,7 @@ describe("checkDraft", () => {
       path: ["Nike EMEA", "France"],
       said: "the 15th",
       noted: "the 20th",
-      times: 5,
+      times: 4,
       source: { channel: "mail", from: "Julien Moreau" },
     });
     expect(DEMO_DRAFT.text).toContain(thoughts[0].sentence);

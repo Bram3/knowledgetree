@@ -41,12 +41,12 @@ Checklist for recording the finals demo. The same flow is tested end to end in `
 - [ ] Click **Type demo draft** (or type it: "…the cutoff date is the 15th, so please send all variable input
       before then."). Stop typing; after about a second the add-in reads the draft (it checks again on **Send**).
 - Expect one calm card: **Are you sure?** "You wrote the 15th. A leaf on France says it's the 20th."
-  🍃 "Cutoff date for Nike France is the 20th." Source: email from Julien Moreau, 3 March, confirmed 5 times
-  (the seeded mail plus 4 reconfirmations; the date is 231 days before Reset).
+  🍃 "Cutoff date for Nike France is the 20th." Source: email from Julien Moreau, 3 March, confirmed 4 times
+  (the seeded mail plus 3 reconfirmations; the date is 231 days before Reset).
 - [ ] Click **Change to 20th** (the main take).
 - Expect: the draft now says "the cutoff date is the 20th", the card is gone, "✓ Changed to 20th. The leaf is
-  reconfirmed (×6)." **Send** goes through. Changes feed: "Lena Vermeulen changed a mail draft to sarah@nike.fr
-  from the 15th to the 20th, as the leaf says … ×6".
+  reconfirmed (×5)." **Send** goes through. Changes feed: "Lena Vermeulen changed a mail draft to sarah@nike.fr
+  from the 15th to the 20th, as the leaf says … ×5".
 - Variant **15th is correct**: a new leaf (quote = the draft sentence) appears on Nike EMEA › France › Payroll,
   the old leaf turns brown (🍂 in doubt) and the Changes feed says "Asked Sofie De Smet". In **Teams**, **Viewing
   as** › Sofie De Smet shows one card: "Lena said the 15th, the leaf says the 20th." (New one is right / Keep the
