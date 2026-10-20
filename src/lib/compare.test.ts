@@ -52,9 +52,9 @@ const mail20 = { ...call20, statement: "Nike Deutschland GmbH confirms the payro
 const callInput = { channel: "call" as const, trigger: "auto" as const, text: CALL, ref: "call:katrin-1", from: "Katrin Vogel <katrin.vogel@nike.com>" };
 const mailInput = { channel: "mail" as const, trigger: "auto" as const, text: MAIL, ref: "outlook:e7", from: "Katrin Vogel <katrin.vogel@nike.com>" };
 
-/** Gemini's view in the demo: the 20th contradicts Jonas's note (the 18th) and is the same fact as the other 20th leaf. */
+/** Gemini's view in the demo: the 20th contradicts Jonas's note (the 15th) and is the same fact as the other 20th leaf. */
 const demoJudge = (text: string): Judgement => {
-  if (/moves to the 18th/i.test(text)) return { relation: "contradicts", said: "the 20th", noted: "the 18th" };
+  if (/NOTE "Payroll cutoff Germany: the 15th/.test(text)) return { relation: "contradicts", said: "the 20th", noted: "the 15th" };
   if ((text.match(/20th/g) ?? []).length >= 2) return { relation: "same" };
   return { relation: "unrelated" };
 };
@@ -68,7 +68,7 @@ describe("compare at ingest", () => {
     const { client } = fakeModel([call20], demoJudge);
     const { leaves } = await ingest(lena(), callInput, { model: client });
 
-    expect(leaves).toMatchObject([{ status: "conflict", conflictsWith: "i-nk-de-cutoff-new", conflictClaims: { said: "the 20th", noted: "the 18th" } }]);
+    expect(leaves).toMatchObject([{ status: "conflict", conflictsWith: "i-nk-de-cutoff-new", conflictClaims: { said: "the 20th", noted: "the 15th" } }]);
     expect(leavesForNode("nk-de-gmbh")).toMatchObject([{ status: "conflict" }]);
   });
 
@@ -85,25 +85,26 @@ describe("the demo flows work from the committed cache (Vertex down)", () => {
   const mailById = (id: string) => mailIngestInput(DEMO_MAILS.find((m) => m.id === id)!);
   const sofie = DEMO_TEAMS_MESSAGES.find((m) => m.id === "m3")!;
 
-  it("Katrin's mail (18th) and then Sofie's 🍃 in Teams (18th) make one leaf ×2", async () => {
-    const first = await ingest(lena(), mailById("e1"), { model: down });
-    const change = first.leaves.find((l) => l.type === "change")!;
-    const res = await ingest(lena(), teamsReactionInput(sofie), { model: down });
-    expect(res.reconfirmed).toMatchObject([{ id: change.id, reconfirmedAt: [expect.any(String)] }]);
-    expect(leavesForNode("nk-de-gmbh").filter((l) => l.type === "change")).toHaveLength(1);
+  it("Katrin's heads-up mail before the call and Sofie's 🍃 don't conflict with Jonas's note", async () => {
+    const mail = await ingest(lena(), mailById("e1"), { model: down });
+    const teams = await ingest(lena(), teamsReactionInput(sofie), { model: down });
+    expect([...mail.leaves, ...teams.leaves].map((l) => [l.type, l.status])).toEqual([["promise", "auto"], ["risk", "auto"], ["attention", "auto"]]);
   });
 
-  it("the other way round too: Sofie's 🍃 first, then Katrin's mail", async () => {
-    const first = await ingest(lena(), teamsReactionInput(sofie), { model: down });
-    const change = first.leaves.find((l) => l.type === "change")!;
-    const res = await ingest(lena(), mailById("e1"), { model: down });
-    expect(res.reconfirmed).toMatchObject([{ id: change.id }]);
+  it("opening the heads-up mail and Sofie's 🍃 first doesn't change scene 3: still one conflict, then ×2", async () => {
+    await ingest(lena(), mailById("e1"), { model: down });
+    await ingest(lena(), teamsReactionInput(sofie), { model: down });
+    const call = await ingestDemoCall(lena(), { model: down });
+    const change = call.leaves.find((l) => l.type === "change")!;
+    expect(call.leaves.filter((l) => l.status === "conflict")).toEqual([change]);
+    const confirmation = await ingest(lena(), mailById("e7"), { model: down });
+    expect(confirmation.reconfirmed).toMatchObject([{ id: change.id }]);
   });
 
   it("scene 3: the call's 20th conflicts with Jonas's note, and Katrin's confirmation mail makes it ×2", async () => {
     const call = await ingestDemoCall(lena(), { model: down });
     const change = call.leaves.find((l) => l.type === "change")!;
-    expect(change).toMatchObject({ status: "conflict", conflictsWith: "i-nk-de-cutoff-new", conflictClaims: { said: "the 20th", noted: "the 18th" } });
+    expect(change).toMatchObject({ status: "conflict", conflictsWith: "i-nk-de-cutoff-new", conflictClaims: { said: "the 20th", noted: "the 15th" } });
     expect(call.leaves.filter((l) => l.status === "conflict")).toHaveLength(1);
 
     const mail = await ingest(lena(), mailById("e7"), { model: down });
@@ -113,7 +114,7 @@ describe("the demo flows work from the committed cache (Vertex down)", () => {
 
   it("Katrin's confirmation of the 20th conflicts with Jonas's note when nothing else was caught yet", async () => {
     const { leaves } = await ingest(lena(), mailById("e7"), { model: down });
-    expect(leaves).toMatchObject([{ status: "conflict", conflictsWith: "i-nk-de-cutoff-new", conflictClaims: { said: "the 20th", noted: "the 18th" } }]);
+    expect(leaves).toMatchObject([{ status: "conflict", conflictsWith: "i-nk-de-cutoff-new", conflictClaims: { said: "the 20th", noted: "the 15th" } }]);
   });
 });
 

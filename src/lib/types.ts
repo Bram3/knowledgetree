@@ -135,7 +135,7 @@ export type Leaf = {
   reconfirmedAt: string[]; // ×n label = length + 1
   usefulCount: number;
   conflictsWith?: string; // id of the note (Item) this leaf contradicts
-  conflictClaims?: { said: string; noted: string }; // short claims for the owner's card: "Katrin said the 20th, your note says the 18th"
+  conflictClaims?: { said: string; noted: string }; // short claims for the owner's card: "Katrin said the 20th, your note says the 15th"
   deferredAt?: string; // the owner tapped "Not sure": the conflict waits in the digest, no card
   reconfirmedBy?: LeafSource[]; // the sources behind reconfirmedAt (same order), so re-ingesting one is idempotent
   promotedToItemId?: string;

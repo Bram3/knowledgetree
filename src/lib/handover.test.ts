@@ -6,18 +6,18 @@ import { addLeaves, getLeaf } from "./leaves";
 import { AccessDeniedError } from "./access";
 
 const p = (id: string) => person(id)!;
-const NOW = new Date("2026-10-20T10:00:00Z"); // demo day
+const NOW = new Date(); // seeded leaves are aged relative to the reset (seed-leaves.ts)
 
 beforeEach(() => resetDb());
 
 describe("knowledge risk", () => {
-  it("Nike: 62% of what we know about Germany comes from Jonas", () => {
-    expect(customerRisk("nike", NOW)).toMatchObject({ nodeId: "nk-de", nodeName: "Germany", personId: "jonas", percent: 62 });
+  it("Nike: before the demo, 72% of what we know about Germany comes from Jonas (62% once the demo adds Lena's leaves, see demo-run.test)", () => {
+    expect(customerRisk("nike", NOW)).toMatchObject({ nodeId: "nk-de", nodeName: "Germany", personId: "jonas", percent: 72 });
   });
 
   it("only current knowledge counts: a fallen leaf from Jonas doesn't raise it", () => {
     addLeaves([{ ...getLeaf("sl-jb-1")!, id: "old-promise", type: "promise", source: { ...getLeaf("sl-jb-1")!.source, at: "2026-01-01T10:00:00Z" } }]);
-    expect(customerRisk("nike", NOW)?.percent).toBe(62);
+    expect(customerRisk("nike", NOW)?.percent).toBe(72);
   });
 });
 
@@ -27,7 +27,7 @@ describe("role change", () => {
     markRoleChange(p("marta"), "jonas", "nike");
     const [o] = orphanedKnowledge("nike");
     expect(o.personId).toBe("jonas");
-    expect(o.leafIds).toHaveLength(10);
+    expect(o.leafIds).toHaveLength(15);
     expect(o.itemIds.sort()).toEqual(["i-nk-de-cutoff-new", "i-nk-de-lohnsteuer", "i-nk-de-retail", "i-nk-de-time"]);
   });
 
@@ -70,7 +70,7 @@ describe("handover", () => {
 
     const [latest] = recentActivity(1, { companyId: "nike" });
     expect(latest).toMatchObject({ action: "handed_over", actorId: "marta" });
-    expect(latest.summary).toBe("handed over 10 leaves and 4 items from Jonas Becker to Lena Vermeulen");
+    expect(latest.summary).toBe("handed over 15 leaves and 4 items from Jonas Becker to Lena Vermeulen");
   });
 
   it("someone without Nike access can't be chosen, and nothing moves", () => {
@@ -102,8 +102,8 @@ describe("handover brief", () => {
     const h = handToLena();
     const b = handoverBrief(p("lena"), h.id, NOW);
     expect(b).toMatchObject({ companyName: "Nike EMEA", fromName: "Jonas Becker", toName: "Lena Vermeulen" });
-    expect(b.facts.map((f) => f.text)).toContain("Payroll cutoff Germany moves to the 18th");
-    expect(b.facts.map((f) => f.text)).toContain("Agreed: SDWorx does a dry run of the October payroll on the new time registration export.");
+    expect(b.facts.map((f) => f.text)).toContain("Payroll cutoff Germany: the 15th of the month");
+    expect(b.facts.map((f) => f.text)).toContain("Agreed: SDWorx does a dry run of the first payroll on the new time registration export.");
     expect(b.attention.map((f) => f.text)).toContain("The works council (Betriebsrat) must approve every change to shift patterns before payroll applies it.");
     expect(b.people.map((f) => f.text)).toEqual(expect.arrayContaining([expect.stringContaining("Katrin Vogel"), expect.stringContaining("Jonas Becker")]));
     const all = [...b.facts, ...b.conflicts, ...b.attention, ...b.people];
@@ -112,7 +112,7 @@ describe("handover brief", () => {
       expect(point.source.href).toMatch(/^\/customers\/nike/);
     }
     const dryRun = b.facts.find((f) => f.text.startsWith("Agreed: SDWorx does a dry run"))!;
-    expect(dryRun.source.quote).toBe("we do a dry run on the new export before the October payroll");
+    expect(dryRun.source.quote).toBe("we do a dry run on the new export before the first payroll");
   });
 
   it("lists open conflicts on the handed-over knowledge", () => {

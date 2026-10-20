@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { seed } from "./seed";
+import { seedLeavesAt } from "./seed-leaves";
 import type { Db, Item, OrgNode, Activity } from "./types";
 import { PRODUCTS, OTHER_CATEGORY, type Product } from "./catalog";
 
@@ -15,6 +16,11 @@ declare global {
   var __ktdb: Db | undefined;
 }
 
+/** The seed as of now: seeded leaves are aged relative to the reset, so every take of the demo shows the same tree. */
+function freshSeed(): Db {
+  return { ...structuredClone(seed), leaves: seedLeavesAt(new Date()) };
+}
+
 function load(): Db {
   if (globalThis.__ktdb) return globalThis.__ktdb;
   try {
@@ -26,7 +32,7 @@ function load(): Db {
       return db;
     }
   } catch {}
-  globalThis.__ktdb = structuredClone(seed);
+  globalThis.__ktdb = freshSeed();
   persist();
   return globalThis.__ktdb;
 }
@@ -49,7 +55,7 @@ export function saveDb(mutate: (db: Db) => void) {
 }
 
 export function resetDb() {
-  globalThis.__ktdb = structuredClone(seed);
+  globalThis.__ktdb = freshSeed();
   persist();
 }
 

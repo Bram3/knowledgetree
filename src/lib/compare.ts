@@ -3,7 +3,7 @@ import { isLive } from "./leaves";
 import { assertItemAccess, assertNodeAccess, AccessDeniedError } from "./access";
 import { canAccess } from "./auth";
 import { generate, cacheKeyFor, type ModelClient } from "./gemini";
-import { COMPARE_SYSTEM, COMPARE_SCHEMA, compareText, describeLeaf, describeNote } from "./compare-prompt";
+import { COMPARE_SYSTEM, COMPARE_SCHEMA, compareText, correctedNote, describeLeaf, describeNote } from "./compare-prompt";
 import type { ActivityAction, Db, Leaf, LeafSource, Person } from "./types";
 
 /**
@@ -92,7 +92,7 @@ export type ConflictCard = {
   note: { id: string; title: string; version: number };
   path: string[];
   companyId: string;
-  text: string; // "Katrin said the 20th, your note says the 18th."
+  text: string; // "Katrin said the 20th, your note says the 15th."
 };
 
 /**
@@ -148,8 +148,7 @@ export function resolveConflict(owner: Person, leafId: string, choice: ConflictC
     const who = saidBy(l.source);
     if (choice === "correct") {
       const reason = `${who} said ${c.said} (${l.source.channel}, ${day(l.source.at)}): "${l.quote}"`;
-      it.title = replaceClaim(it.title, c.noted, c.said);
-      it.content = `> **Update ${day(at)}:** ${l.statement} Source: ${l.source.channel} with ${who}.\n\n${it.content}`;
+      Object.assign(it, correctedNote(it, { statement: l.statement, channel: l.source.channel, saidBy: who }, c));
       it.versions.push({ version: it.versions.length + 1, byId: owner.id, at, note: reason, source: { ...l.source, leafId: l.id } });
       it.updatedAt = at;
       it.verifiedById = owner.id;
@@ -207,9 +206,3 @@ function saidBy(s: LeafSource) {
 const firstName = (s: LeafSource) => saidBy(s).split(" ")[0];
 
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-
-/** "Payroll cutoff Germany moves to the 18th" with noted "the 18th", said "the 20th" → "… moves to the 20th". */
-function replaceClaim(title: string, noted: string, said: string) {
-  const i = title.toLowerCase().indexOf(noted.toLowerCase());
-  return i < 0 ? title : title.slice(0, i) + said + title.slice(i + noted.length);
-}

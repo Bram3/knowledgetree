@@ -23,13 +23,14 @@ As discussed on the phone: from next month the payroll cutoff for variable input
 Thanks for picking this up so quickly.
 
 Katrin`, unread: true },
-  { id: "e1", from: "Katrin Vogel", email: "katrin.vogel@nike.com", subject: "Updated payroll calendar Q4 2026 – Nike Deutschland GmbH", time: "08:41", preview: "Hi Lena, as discussed with Sofie, please find attached the new payroll calendar…", body: `Hi Lena,
+  // Before the call: Katrin announces that the cutoff will change and that she will call. No date yet, so no conflict.
+  { id: "e1", from: "Katrin Vogel", email: "katrin.vogel@nike.com", subject: "Payroll calendar Q4 2026 – Nike Deutschland GmbH", time: "Yesterday", preview: "Hi Lena, as discussed with Sofie, please find attached the payroll calendar…", body: `Hi Lena,
 
-As discussed with Sofie, please find attached the new payroll calendar for Nike Deutschland GmbH for Q4 2026.
+As discussed with Sofie, please find attached the payroll calendar for Nike Deutschland GmbH for Q4 2026. Pay date remains the 25th.
 
-Important: from the October run the cutoff for variable input moves from the 15th to the 18th of the month, because of our new time registration system. Pay date remains the 25th.
+Heads-up: because of our new time registration system the cutoff for variable input will move later in the month. I will call you this week to agree on the new date before anything changes.
 
-Could you confirm that SDWorx has this on file? We had some confusion last year with different versions floating around.
+Could you make sure SDWorx only works from this calendar? We had some confusion last year with different versions floating around.
 
 Mit freundlichen Grüßen,
 Katrin Vogel
