@@ -2,12 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "./auth";
-import { getDb, nodePath, person } from "./db";
+import { getDb, node, nodePath, person } from "./db";
 import { ingest, validateIngestInput, type IngestResult } from "./ingest";
 import { ingestDemoCall } from "./demo-call";
-import { getLeaf, removeLeaves } from "./leaves";
+import { getLeaf, leavesFromSource, removeLeaves } from "./leaves";
 import { AccessDeniedError, assertNodeAccess } from "./access";
-import { conflictCardsFor, resolveConflict, CONFLICT_CHOICES, type ConflictCard, type ConflictChoice, type ReconfirmedNote } from "./compare";
+import { conflictCardsFor, resolveConflict, leavesReconfirmedBy, notesReconfirmedBy, CONFLICT_CHOICES, type ConflictCard, type ConflictChoice, type ReconfirmedNote } from "./compare";
+import { DEMO_TEAMS_MESSAGES, teamsReactionInput } from "./demo-teams";
+import { canAccess } from "./auth";
 import type { Leaf, Person } from "./types";
 
 export type IngestedLeaf = Leaf & { path: string[] };
@@ -16,7 +18,6 @@ export type Ingested = { leaves: IngestedLeaf[]; reconfirmed: IngestedLeaf[]; re
 
 /** New leaves plus the known leaves and notes this message reconfirmed (×n), each leaf with its node path for display. */
 function withPaths(res: IngestResult): Ingested {
-  if (res.leaves.length || res.reconfirmed.length || res.reconfirmedNotes.length) revalidatePath("/", "layout");
   const withPath = (l: Leaf) => ({ ...l, path: nodePath(l.nodeId).map((n) => n.name) });
   return { companyId: res.companyId, leaves: res.leaves.map(withPath), reconfirmed: res.reconfirmed.map(withPath), reconfirmedNotes: res.reconfirmedNotes };
 }
@@ -27,13 +28,43 @@ function withPaths(res: IngestResult): Ingested {
  */
 export async function ingestText(input: unknown): Promise<Ingested> {
   const user = await requireUser();
-  return withPaths(await ingest(user, validateIngestInput(input)));
+  return grown(withPaths(await ingest(user, validateIngestInput(input))));
 }
 
 /** Hang up the demo call: the server transcribes its own demo audio and ingests it (call channel, trigger auto). */
 export async function endDemoCall(): Promise<Ingested> {
   const user = await requireUser();
-  return withPaths(await ingestDemoCall(user));
+  return grown(withPaths(await ingestDemoCall(user)));
+}
+
+/** Refresh the tree when a message grew or reconfirmed something. */
+function grown(res: Ingested): Ingested {
+  if (res.leaves.length || res.reconfirmed.length || res.reconfirmedNotes.length) revalidatePath("/", "layout");
+  return res;
+}
+
+/**
+ * The 🍃 reactions in the Teams chat, from what is stored: per message id, the leaves (and known leaves or notes)
+ * its reaction grew, on customers the signed-in user can access. A reaction that kept nothing isn't stored.
+ */
+export async function teamsReactions(): Promise<Record<string, Ingested>> {
+  const user = await requireUser();
+  const visible = (nodeId: string) => {
+    const n = node(nodeId);
+    return n && canAccess(user, n.companyId) ? n.companyId : null;
+  };
+  const out: Record<string, Ingested> = {};
+  for (const m of DEMO_TEAMS_MESSAGES) {
+    const { channel, ref } = teamsReactionInput(m);
+    const res = {
+      leaves: leavesFromSource(channel, ref).filter((l) => visible(l.nodeId)),
+      reconfirmed: leavesReconfirmedBy(channel, ref).filter((l) => visible(l.nodeId)),
+      reconfirmedNotes: notesReconfirmedBy(channel, ref).filter((n) => visible(n.nodeId)),
+    };
+    const first = res.leaves[0] ?? res.reconfirmed[0] ?? res.reconfirmedNotes[0];
+    if (first) out[m.id] = withPaths({ ...res, companyId: visible(first.nodeId) });
+  }
+  return out;
 }
 
 const MAX_UNDO = 10;

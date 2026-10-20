@@ -1,6 +1,6 @@
 import { signInAs, signOut } from "@/test/next-mocks";
 import { beforeEach, describe, expect, it } from "vitest";
-import { ingestText } from "./leaf-actions";
+import { ingestText, teamsReactions } from "./leaf-actions";
 import { leavesForCompany } from "./leaves";
 import { resetDb } from "./db";
 import { DEMO_TEAMS_MESSAGES, teamsReactionInput } from "./demo-teams";
@@ -37,6 +37,20 @@ describe("🍃 reaction in Teams", () => {
     const again = await ingestText(teamsReactionInput(msg("m3")));
     expect(again.leaves.map((l) => l.id)).toEqual(first.leaves.map((l) => l.id));
     expect(leavesForCompany("nike")).toHaveLength(before + first.leaves.length);
+  });
+
+  it("after a reload the 🍃 is still there: it comes from the stored leaves, not from the page", async () => {
+    expect(await teamsReactions()).toEqual({});
+    const { leaves } = await ingestText(teamsReactionInput(msg("m3")));
+    const shown = await teamsReactions(); // what the Teams page loads
+    expect(Object.keys(shown)).toEqual(["m3"]);
+    expect(shown.m3).toMatchObject({ companyId: "nike", leaves: leaves.map((l) => ({ id: l.id, path: l.path })) });
+  });
+
+  it("someone without access to the customer doesn't see where the leaf grew", async () => {
+    await ingestText(teamsReactionInput(msg("m3")));
+    await signInAs("amelie");
+    expect(await teamsReactions()).toEqual({});
   });
 
   it("reacting to the handover greeting keeps nothing", async () => {
