@@ -1,13 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import fs from "fs";
-import path from "path";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getDb, saveDb, resetDb, uid, node, detectNode, detectTopic, search, person, nodePath, company, categoryForTopic } from "./db";
-import { getCurrentUser, USER_COOKIE } from "./auth";
-import type { Item, ActivityAction } from "./types";
+import { getDb, saveDb, resetDb, uid, detectNode, detectTopic, search, person, nodePath, company, categoryForTopic } from "./db";
+import { getCurrentUser, setSessionCookie, USER_COOKIE } from "./auth";
+import { requireCustomerAccess, requireItemAccess, requireCompanyAccess, AccessDeniedError } from "./access";
+import type { Item, ActivityAction, Person } from "./types";
+import { storeUpload } from "./uploads";
+import { assertLinkableFile } from "./files";
 
 async function actor() {
   const u = await getCurrentUser();
@@ -29,7 +30,7 @@ function revalidateAll() {
 export async function login(personId: string) {
   const p = getDb().people.find((x) => x.id === personId);
   if (!p) return;
-  (await cookies()).set(USER_COOKIE, p.id, { path: "/", httpOnly: true, sameSite: "lax" });
+  await setSessionCookie(p.id);
   redirect("/");
 }
 
@@ -41,7 +42,7 @@ export async function logout() {
 // ---------- knowledge ----------
 
 export async function addNote(input: { nodeId: string; title: string; content: string; topic: string; category?: string; origin?: Item["origin"]; scope: string[]; source?: Item["source"] }) {
-  const u = await actor();
+  const { user: u } = await requireCustomerAccess(input.nodeId);
   const id = uid("i");
   const at = new Date().toISOString();
   saveDb((db) => {
@@ -59,8 +60,16 @@ export async function addNote(input: { nodeId: string; title: string; content: s
   return id;
 }
 
-export async function addFile(input: { nodeId: string; title: string; fileName: string; fileSize?: string; fileUrl?: string; previewUrl?: string; content: string; topic: string; category?: string; origin?: Item["origin"]; scope: string[]; source?: Item["source"] }) {
-  const u = await actor();
+type FileInput = { nodeId: string; title: string; fileName: string; fileSize?: string; fileUrl?: string; previewUrl?: string; content: string; topic: string; category?: string; origin?: Item["origin"]; scope: string[]; source?: Item["source"] };
+
+/** Link an existing file (seeded/mailbox document or an earlier upload) as a new item. URLs are checked by assertLinkableFile. */
+export async function addFile(input: FileInput) {
+  const { user: u } = await requireCustomerAccess(input.nodeId);
+  for (const url of [input.fileUrl, input.previewUrl]) if (url) assertLinkableFile(u, url);
+  return createFileItem(u, input);
+}
+
+function createFileItem(u: Person, input: FileInput) {
   const id = uid("i");
   const at = new Date().toISOString();
   saveDb((db) => {
@@ -78,63 +87,43 @@ export async function addFile(input: { nodeId: string; title: string; fileName: 
   return id;
 }
 
-/** Real upload: stores the file under data/uploads and creates the item. Called with a FormData from the upload form. */
+/** Real upload: validates and stores the file under data/uploads and creates the item. Called with a FormData from the upload form. */
 export async function uploadFile(fd: FormData) {
-  await actor();
-  const file = fd.get("file") as File | null;
   const nodeId = String(fd.get("nodeId"));
-  let fileName = String(fd.get("fileName") || (file?.name ?? "document.pdf"));
-  let fileUrl: string | undefined;
-  let previewUrl: string | undefined;
-  let fileSize = "—";
-  if (file && file.size > 0) {
-    fileName = file.name;
-    const stored = `${uid("f")}-${file.name.replace(/[^A-Za-z0-9._-]/g, "_")}`;
-    const dir = path.join(process.cwd(), "data", "uploads");
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, stored), Buffer.from(await file.arrayBuffer()));
-    fileUrl = `/api/files/${stored}`;
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    if (ext === "pdf" || ["png", "jpg", "jpeg", "gif", "svg", "txt", "md"].includes(ext ?? "")) previewUrl = fileUrl;
-    fileSize = file.size > 1024 * 1024 ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(file.size / 1024))} KB`;
-  }
+  const { user } = await requireCustomerAccess(nodeId);
+  const file = fd.get("file") as File | null;
+  let stored: Awaited<ReturnType<typeof storeUpload>> = { fileName: String(fd.get("fileName") || "document.pdf"), fileUrl: "", fileSize: "—" };
+  if (file && file.size > 0) stored = await storeUpload(file);
   const scope = String(fd.get("scope") || "all").split(",").map((s) => s.trim()).filter(Boolean);
-  return addFile({ nodeId, title: String(fd.get("title") || fileName), fileName, fileSize, fileUrl, previewUrl, content: String(fd.get("content") || ""), topic: String(fd.get("topic") || ""), category: String(fd.get("category") || ""), origin: (String(fd.get("origin") || "sdworx") as Item["origin"]), scope });
+  return createFileItem(user, { nodeId, title: String(fd.get("title") || stored.fileName), fileName: stored.fileName, fileSize: stored.fileSize, fileUrl: stored.fileUrl || undefined, previewUrl: stored.previewUrl, content: String(fd.get("content") || ""), topic: String(fd.get("topic") || ""), category: String(fd.get("category") || ""), origin: (String(fd.get("origin") || "sdworx") as Item["origin"]), scope });
 }
 
 /** Upload a new version of an existing document. */
 export async function uploadVersion(fd: FormData) {
-  const u = await actor();
   const itemId = String(fd.get("itemId"));
+  const { user: u } = await requireItemAccess(itemId);
   const note = String(fd.get("note") || "New version");
   const file = fd.get("file") as File | null;
+  const stored = file && file.size > 0 ? await storeUpload(file) : null;
   saveDb((db) => {
     const it = db.items.find((i) => i.id === itemId);
     if (!it) return;
     const at = new Date().toISOString();
-    if (file && file.size > 0) {
-      const stored = `${uid("f")}-${file.name.replace(/[^A-Za-z0-9._-]/g, "_")}`;
-      const dir = path.join(process.cwd(), "data", "uploads");
-      fs.mkdirSync(dir, { recursive: true });
-      // FormData files are read synchronously here via the buffered arrayBuffer below
-      pendingWrites.push({ path: path.join(dir, stored), file });
-      it.fileName = file.name;
-      it.fileUrl = `/api/files/${stored}`;
-      const ext = file.name.split(".").pop()?.toLowerCase();
-      it.previewUrl = ext === "pdf" || ["png", "jpg", "jpeg", "gif", "svg", "txt", "md"].includes(ext ?? "") ? it.fileUrl : undefined;
-      it.fileSize = file.size > 1024 * 1024 ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(file.size / 1024))} KB`;
+    if (stored) {
+      it.fileName = stored.fileName;
+      it.fileUrl = stored.fileUrl;
+      it.previewUrl = stored.previewUrl;
+      it.fileSize = stored.fileSize;
     }
     it.versions.push({ version: it.versions.length + 1, byId: u.id, at, note });
     it.updatedAt = at;
     log(db, "new_version", it.nodeId, `uploaded version ${it.versions.length} of ${it.title}`, u.id, it.id);
   });
-  for (const w of pendingWrites.splice(0)) fs.writeFileSync(w.path, Buffer.from(await w.file.arrayBuffer()));
   revalidateAll();
 }
-const pendingWrites: { path: string; file: File }[] = [];
 
 export async function updateNote(itemId: string, content: string, note: string) {
-  const u = await actor();
+  const { user: u } = await requireItemAccess(itemId);
   saveDb((db) => {
     const it = db.items.find((i) => i.id === itemId);
     if (!it) return;
@@ -148,7 +137,7 @@ export async function updateNote(itemId: string, content: string, note: string) 
 }
 
 export async function claimItem(itemId: string) {
-  const u = await actor();
+  const { user: u } = await requireItemAccess(itemId);
   saveDb((db) => {
     const it = db.items.find((i) => i.id === itemId);
     if (!it) return;
@@ -160,7 +149,7 @@ export async function claimItem(itemId: string) {
 }
 
 export async function addVersion(itemId: string, note: string) {
-  const u = await actor();
+  const { user: u } = await requireItemAccess(itemId);
   saveDb((db) => {
     const it = db.items.find((i) => i.id === itemId);
     if (!it) return;
@@ -173,7 +162,7 @@ export async function addVersion(itemId: string, note: string) {
 }
 
 export async function archiveItem(itemId: string) {
-  const u = await actor();
+  const { user: u } = await requireItemAccess(itemId);
   saveDb((db) => {
     const it = db.items.find((i) => i.id === itemId);
     if (!it) return;
@@ -185,7 +174,9 @@ export async function archiveItem(itemId: string) {
 }
 
 export async function addNode(input: { companyId: string; parentId: string; name: string; type: "country" | "entity" | "division" | "team"; country?: string }) {
-  const u = await actor();
+  const { user: u, node: parent } = await requireCustomerAccess(input.parentId);
+  await requireCompanyAccess(input.companyId);
+  if (parent.companyId !== input.companyId) throw new AccessDeniedError();
   const id = uid("n");
   saveDb((db) => {
     db.nodes.push({ id, companyId: input.companyId, parentId: input.parentId, name: input.name, type: input.type, country: input.country, expertIds: [u.id] });
@@ -196,6 +187,7 @@ export async function addNode(input: { companyId: string; parentId: string; name
 }
 
 export async function resetDemo() {
+  await actor();
   resetDb();
   revalidateAll();
 }
@@ -264,8 +256,7 @@ export async function askBot(question: string): Promise<BotAnswer> {
 }
 
 export async function nodeSummary(nodeId: string) {
-  const n = node(nodeId);
-  if (!n) return null;
+  const { node: n } = await requireCustomerAccess(nodeId);
   const db = getDb();
   const items = db.items.filter((i) => i.nodeId === nodeId && i.status === "active").map((i) => ({ id: i.id, title: i.title, kind: i.kind, owner: person(i.ownerId)?.name ?? null, updatedAt: i.updatedAt, category: i.category, origin: i.origin }));
   return { name: n.name, path: nodePath(nodeId).map((p) => p.name), items, experts: n.expertIds.map((e) => person(e)?.name).filter(Boolean) as string[] };

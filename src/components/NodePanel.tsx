@@ -14,6 +14,7 @@ import { ViewDocumentButton } from "./DocumentViewer";
 import { NoteEditor } from "./NoteEditor";
 import { fmtDate, timeAgo, COUNTRY_NAME } from "@/lib/format";
 import { claimItem, addNote, uploadFile, uploadVersion, updateNote, archiveItem } from "@/lib/actions";
+import { UPLOAD_ACCEPT } from "@/lib/upload-rules";
 
 export type PanelItem = Item & { inheritedFrom?: string };
 export type PanelData = {
@@ -171,6 +172,7 @@ function ItemCard({ item, highlight, me, categories }: { item: PanelItem; highli
   const [open, setOpen] = useState(highlight);
   const [editing, setEditing] = useState(false);
   const [newVersion, setNewVersion] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const last = item.versions.at(-1)!;
   const doc = { title: item.title, fileName: item.fileName, fileSize: item.fileSize, fileUrl: item.fileUrl, previewUrl: item.previewUrl, meta: `v${item.versions.length} · ${personName(item.ownerId)}` };
@@ -227,11 +229,12 @@ function ItemCard({ item, highlight, me, categories }: { item: PanelItem; highli
             </div>
           )}
           {newVersion && (
-            <form className="mt-2 flex flex-wrap items-center gap-1.5 rounded-[4px] bg-sd-subtle p-2" action={(fd) => start(async () => { await uploadVersion(fd); setNewVersion(false); })}>
+            <form className="mt-2 flex flex-wrap items-center gap-1.5 rounded-[4px] bg-sd-subtle p-2" action={(fd) => start(async () => { try { setUploadError(null); await uploadVersion(fd); setNewVersion(false); } catch { setUploadError(UPLOAD_ERROR); } })}>
               <input type="hidden" name="itemId" value={item.id} />
-              <input type="file" name="file" className="text-[11.5px]" />
+              <input type="file" name="file" accept={UPLOAD_ACCEPT} className="text-[11.5px]" />
               <input name="note" placeholder="What changed?" className="input min-w-0 flex-1 px-2 py-1 text-[12px]" />
               <button disabled={pending} className="btn-primary px-2.5 py-1.5 text-[12px] disabled:opacity-50">{pending ? "Uploading…" : "Save version"}</button>
+              {uploadError && <div className="w-full text-[11.5px] text-sd-red">{uploadError}</div>}
             </form>
           )}
         </div>
@@ -241,17 +244,21 @@ function ItemCard({ item, highlight, me, categories }: { item: PanelItem; highli
   );
 }
 
+const UPLOAD_ERROR = "Upload refused: use PDF, Word, Excel, PowerPoint, an image or text, up to 10 MB.";
+
 function UploadForm({ nodeId, country, categories, defaultCategory, onDone }: { nodeId: string; country?: string; categories: Product[]; defaultCategory?: string; onDone: () => void }) {
   const [pending, start] = useTransition();
   const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
   return (
-    <form className="fade-up space-y-2 rounded-[8px] border border-sd-primary bg-sd-subtle p-3" action={(fd) => start(async () => { await uploadFile(fd); onDone(); })}>
+    <form className="fade-up space-y-2 rounded-[8px] border border-sd-primary bg-sd-subtle p-3" action={(fd) => start(async () => { try { setError(null); await uploadFile(fd); onDone(); } catch { setError(UPLOAD_ERROR); } })}>
       <input type="hidden" name="nodeId" value={nodeId} />
       <div className="flex items-center gap-2 text-[12.5px] font-semibold"><Upload className="h-4 w-4" /> Upload a document</div>
       <label className="flex cursor-pointer items-center gap-3 rounded-[4px] border border-dashed border-sd-border bg-white px-3 py-3 text-[12.5px] text-sd-muted hover:border-sd-primary">
         <Paperclip className="h-4 w-4" /> {name || "Choose a file (PDF, Word, Excel, image…)"}
-        <input type="file" name="file" required className="hidden" onChange={(e) => setName(e.target.files?.[0]?.name ?? "")} />
+        <input type="file" name="file" required accept={UPLOAD_ACCEPT} className="hidden" onChange={(e) => setName(e.target.files?.[0]?.name ?? "")} />
       </label>
+      {error && <div className="text-[12px] text-sd-red">{error}</div>}
       <input name="title" placeholder="Title (defaults to the file name)" className="input w-full px-2.5 py-1.5 text-[13px]" />
       <textarea name="content" rows={2} placeholder="Short description of what is in the file" className="input w-full px-2.5 py-1.5 text-[13px]" />
       <div className="grid grid-cols-2 gap-2">

@@ -133,6 +133,10 @@ pnpm dev
 
 Data lives in `data/db.json`, created from the seed on first start. **Reset demo data** in the sidebar restores the seed. Uploads land in `data/uploads`.
 
+Tests: `pnpm test` (vitest).
+
+The session cookie is signed with `SESSION_SECRET` (see `.env.example`). Locally a dev-only fallback is used; in production set it (for Cloud Run: `--set-env-vars SESSION_SECRET=$(openssl rand -hex 32)`), otherwise a random per-instance secret is used and everyone is signed out on restart.
+
 ### Stack
 
 Next.js 16 (App Router, server actions, route handlers), React 19, Tailwind 4, React Flow with dagre for the organigram, react-markdown for notes. Branding follows the SDWorx Ignite design system (cdn.sdworx.com/ignite): primary blue #006dd8, dark navy #001c52, logo red and yellow, Inter for body text and SD Worx Display for headings. Tokens are in `src/app/globals.css`, the product catalog in `src/lib/catalog.ts`.
@@ -144,7 +148,7 @@ Next.js 16 (App Router, server actions, route handlers), React 19, Tailwind 4, R
 | `src/app` | Pages: search (`/`), customers, customer tree, changes, login, Teams and Outlook mock-ups, file API |
 | `src/components` | Organigram, node panel, document viewer, note editor, mock-ups |
 | `src/lib` | Data model, seed, JSON store, search, node detection, server actions, auth |
-| `public/files` | Generated demo documents (PDF, XLSX, DOCX) and their PDF previews |
+| `assets/files` | Generated demo documents (PDF, XLSX, DOCX) and their PDF previews |
 | `public/logos` | Customer logos |
 | `scripts/generate_files.py` | Regenerates the demo documents (needs Python with reportlab and openpyxl, plus LibreOffice) |
 | `docs/screenshots` | The images in this README |

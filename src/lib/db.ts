@@ -4,7 +4,12 @@ import { seed } from "./seed";
 import type { Db, Item, OrgNode, Activity } from "./types";
 import { PRODUCTS, OTHER_CATEGORY, type Product } from "./catalog";
 
-const FILE = path.join(process.cwd(), "data", "db.json");
+/** Runtime state directory (db.json, uploads/). Override with KT_DATA_DIR (tests use a temp dir). */
+export function dataDir() {
+  return process.env.KT_DATA_DIR || path.join(process.cwd(), "data");
+}
+
+const FILE = path.join(dataDir(), "db.json");
 
 declare global {
   var __ktdb: Db | undefined;

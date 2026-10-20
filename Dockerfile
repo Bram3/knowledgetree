@@ -17,6 +17,8 @@ ENV HOSTNAME=0.0.0.0
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
+# seeded demo documents, served through /files/[name] with a customer access check
+COPY --from=build /app/assets ./assets
 # runtime state (seeded on first request; ephemeral on Cloud Run)
 RUN mkdir -p data/uploads && chown -R node:node /app
 USER node
