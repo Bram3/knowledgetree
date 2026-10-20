@@ -1,9 +1,9 @@
-import { getDb, saveDb, uid, person, nodePath } from "./db";
+import { getDb, saveDb, uid, person, nodePath, node, ancestors } from "./db";
 import { isLive } from "./leaves";
-import { assertItemAccess, assertNodeAccess, AccessDeniedError } from "./access";
+import { assertItemAccess, assertLeafAccess, assertNodeAccess, AccessDeniedError } from "./access";
 import { canAccess } from "./auth";
 import { generate, cacheKeyFor, type ModelClient } from "./gemini";
-import { COMPARE_SYSTEM, COMPARE_SCHEMA, compareText, correctedNote, describeLeaf, describeNote } from "./compare-prompt";
+import { COMPARE_SYSTEM, COMPARE_SCHEMA, compareText, correctedNote, describeLeaf, describeNote, type CompareSide } from "./compare-prompt";
 import type { ActivityAction, Db, Item, Leaf, LeafSource, Person } from "./types";
 
 /**
@@ -18,7 +18,7 @@ import type { ActivityAction, Db, Item, Leaf, LeafSource, Person } from "./types
  */
 
 export type Relation = "same" | "contradicts" | "unrelated";
-type Judgement = { relation: Relation; said: string | null; noted: string | null };
+export type Judgement = { relation: Relation; said: string | null; noted: string | null };
 
 export type CompareOutcome = {
   fresh: Leaf[]; // leaves to store (status "conflict" when they contradict a note)
@@ -114,7 +114,8 @@ export function notesReconfirmedBy(channel: LeafSource["channel"], ref: string):
 
 export type ConflictCard = {
   leaf: Leaf;
-  note: { id: string; title: string; version: number };
+  note: { id: string; title: string; version: number }; // the contradicted note, or leaf when `against` is "leaf" (version = ×n)
+  against?: "leaf"; // #19: a draft's claim against a leaf; the branch owner answers
   path: string[];
   companyId: string;
   text: string; // "Katrin said the 20th, your note says the 15th."
@@ -129,6 +130,22 @@ export function conflictCardsFor(viewer: Person, owner: Person): ConflictCard[] 
   const cards: ConflictCard[] = [];
   for (const leaf of db.leaves) {
     if (leaf.status !== "conflict" || leaf.deferredAt) continue;
+    const target = db.leaves.find((l) => l.id === leaf.conflictsWith);
+    if (target) {
+      // #19: a draft's claim said to be correct against a leaf. The branch owner answers.
+      const n = db.nodes.find((x) => x.id === target.nodeId);
+      if (!n || branchOwnerId(target.nodeId) !== owner.id || !canAccess(viewer, n.companyId) || !canAccess(owner, n.companyId)) continue;
+      const c = leaf.conflictClaims ?? { said: leaf.statement, noted: target.statement };
+      cards.push({
+        leaf,
+        note: { id: target.id, title: target.statement, version: target.reconfirmedAt.length + 1 },
+        against: "leaf",
+        path: nodePath(target.nodeId).map((p) => p.name),
+        companyId: n.companyId,
+        text: `${firstName(leaf.source)} said ${c.said}, the leaf says ${c.noted}.`,
+      });
+      continue;
+    }
     const note = db.items.find((i) => i.id === leaf.conflictsWith);
     if (!note || note.ownerId !== owner.id) continue;
     const n = db.nodes.find((x) => x.id === note.nodeId);
@@ -162,6 +179,7 @@ export function resolveConflict(owner: Person, leafId: string, choice: ConflictC
   const leaf = getDb().leaves.find((l) => l.id === leafId);
   if (!leaf) throw new AccessDeniedError();
   assertNodeAccess(owner, leaf.nodeId);
+  if (getDb().leaves.some((l) => l.id === leaf.conflictsWith)) return resolveLeafConflict(owner, leaf, choice, actor, opts.now);
   const { item: note } = assertItemAccess(owner, leaf.conflictsWith ?? "");
   if (note.ownerId !== owner.id) throw new AccessDeniedError("Only the owner of the note can answer this conflict");
   if (leaf.status !== "conflict") return leaf;
@@ -197,10 +215,60 @@ export function resolveConflict(owner: Person, leafId: string, choice: ConflictC
   return out;
 }
 
+/**
+ * #19: the branch owner's answer when a draft's claim was said to be correct against a leaf.
+ * correct: the new leaf is right (verified), the old leaf falls. keep: the old leaf is right, no longer in doubt;
+ * the new one falls. unsure: waits in the digest, the old leaf stays in doubt.
+ */
+function resolveLeafConflict(owner: Person, leaf: Leaf, choice: ConflictChoice, actor: Person, now?: Date): Leaf {
+  const oldId = leaf.conflictsWith!;
+  assertLeafAccess(owner, oldId);
+  if (branchOwnerId(leaf.nodeId) !== owner.id) throw new AccessDeniedError("Only the branch owner can answer this conflict");
+  if (leaf.status !== "conflict") return leaf;
+  if (choice === "unsure" && leaf.deferredAt) return leaf;
+  const at = (now ?? new Date()).toISOString();
+  const behalf = actor.id === owner.id ? "" : ` on behalf of ${owner.name}`;
+  let out = leaf;
+  saveDb((db) => {
+    const l = db.leaves.find((x) => x.id === leaf.id)!;
+    const old = db.leaves.find((x) => x.id === oldId)!;
+    const c = l.conflictClaims ?? { said: l.statement, noted: old.statement };
+    const who = saidBy(l.source);
+    if (choice === "correct") {
+      l.status = "verified";
+      l.verifiedById = owner.id;
+      old.status = "fallen";
+      delete old.doubtedAt;
+      log(db, "verified", l.nodeId, actor.id, `confirmed ${c.said} from ${who}${behalf}: "${l.statement}". The leaf "${old.statement}" (${c.noted}) fell`, undefined, l.id);
+    } else if (choice === "keep") {
+      l.status = "fallen";
+      delete old.doubtedAt;
+      log(db, "leaf_kept", l.nodeId, actor.id, `kept the leaf "${old.statement}" (${c.noted})${behalf}. ${who}'s ${c.said} fell`);
+    } else {
+      l.deferredAt = at;
+      log(db, "leaf_deferred", l.nodeId, actor.id, `was not sure about ${c.said} vs ${c.noted} for "${old.statement}"${behalf}. It waits in the digest`);
+    }
+    out = structuredClone(l);
+  });
+  return out;
+}
+
+/** Who answers for a branch (#19): the first expert on the node, else on its nearest ancestor. */
+export function branchOwnerId(nodeId: string): string | null {
+  const n = node(nodeId);
+  if (!n) return null;
+  return [n, ...ancestors(nodeId)].find((x) => x.expertIds.length)?.expertIds[0] ?? null;
+}
+
 // ---------- model ----------
 
-async function judge(leaf: Leaf, existing: string, model?: ModelClient): Promise<Judgement> {
-  const text = compareText({ channel: leaf.source.channel, saidBy: saidBy(leaf.source), statement: leaf.statement, quote: leaf.quote }, existing);
+function judge(leaf: Leaf, existing: string, model?: ModelClient): Promise<Judgement> {
+  return judgeClaim({ channel: leaf.source.channel, saidBy: saidBy(leaf.source), statement: leaf.statement, quote: leaf.quote }, existing, model);
+}
+
+/** One COMPARE pair: a claim (a new leaf, or a sentence in a draft) against one existing note or leaf description. */
+export async function judgeClaim(claim: CompareSide & { channel: string; saidBy: string }, existing: string, model?: ModelClient): Promise<Judgement> {
+  const text = compareText(claim, existing);
   const res = await generate({ system: COMPARE_SYSTEM, parts: [{ text }], schema: COMPARE_SCHEMA }, { cacheKey: cacheKeyFor("compare", text), client: model });
   return parseJudgement(res?.text);
 }

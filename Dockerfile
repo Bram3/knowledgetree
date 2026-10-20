@@ -19,8 +19,10 @@ COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 # seeded demo documents, served through /files/[name] with a customer access check
 COPY --from=build /app/assets ./assets
-# runtime state (seeded on first request; ephemeral on Cloud Run)
-RUN mkdir -p data/uploads && chown -R node:node /app
+# runtime state (seeded on first request; ephemeral on Cloud Run). The app runs as the unprivileged
+# `node` user, which may only write its data dir and Next's cache (.next): server code, node_modules
+# and the shipped documents stay root-owned and read-only for the running process.
+RUN mkdir -p data/uploads && chown -R node:node data .next
 USER node
 EXPOSE 8080
 CMD ["node", "server.js"]

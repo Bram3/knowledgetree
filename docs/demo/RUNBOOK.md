@@ -35,6 +35,25 @@ Checklist for recording the finals demo. The same flow is tested end to end in `
 - Expect: "🍃 1" pill with a link to Nike Deutschland GmbH. One attention point: load both exports (hours and
   overtime) before the cutoff.
 
+## Scene 2b: second thought
+
+- [ ] Sidebar **Outlook** › **New mail**. To is `sarah@nike.fr` (Nike France), subject "November payroll Nike France".
+- [ ] Click **Type demo draft** (or type it: "…the cutoff date is the 15th, so please send all variable input
+      before then."). Stop typing; after about a second the add-in reads the draft (it checks again on **Send**).
+- Expect one calm card: **Are you sure?** "You wrote the 15th. A leaf on France says it's the 20th."
+  🍃 "Cutoff date for Nike France is the 20th." Source: email from Julien Moreau, 3 March, confirmed 4 times
+  (the seeded mail plus 3 reconfirmations; the date is 231 days before Reset).
+- [ ] Click **Change to 20th** (the main take).
+- Expect: the draft now says "the cutoff date is the 20th", the card is gone, "✓ Changed to 20th. The leaf is
+  reconfirmed (×5)." **Send** goes through. Changes feed: "Lena Vermeulen changed a mail draft to sarah@nike.fr
+  from the 15th to the 20th, as the leaf says … ×5".
+- Variant **15th is correct**: a new leaf (quote = the draft sentence) appears on Nike EMEA › France › Payroll,
+  the old leaf turns brown (🍂 in doubt) and the Changes feed says "Asked Sofie De Smet". In **Teams**, **Viewing
+  as** › Sofie De Smet shows one card: "Lena said the 15th, the leaf says the 20th." (New one is right / Keep the
+  leaf / Not sure). Switch back to Lena before scene 3.
+- Variant **Ignore**: the card goes and isn't asked again in this mail; nothing is stored.
+- A draft without numbers, or one that says the 20th, shows nothing. France is not Germany: scene 5 still reads 62 %.
+
 ## Scene 3: conflict → Correct → ×2
 
 - [ ] Back to the Nike tree: Nike Deutschland GmbH shows ⚠️ 1 (red ring).

@@ -172,8 +172,13 @@ export type SearchHit = { item: Item; node: OrgNode; score: number; matched: str
 
 const STOP = new Set(["what", "is", "the", "for", "of", "a", "an", "in", "at", "to", "and", "or", "do", "does", "we", "our", "how", "when", "which", "on", "it", "are", "was", "be", "this", "that", "with", "about", "please", "can", "you", "wat", "de", "het", "een", "van", "voor", "bij"]);
 
-export function search(q: string, opts: { companyIds?: string[]; companyId?: string; country?: string } = {}): SearchHit[] {
-  const terms = q.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter((t) => t.length > 1 && !STOP.has(t));
+/** The query comes from the URL: only the first part counts, so a huge ?q= can't tie up the server. */
+const MAX_QUERY_CHARS = 500;
+const MAX_QUERY_TERMS = 30;
+
+export function search(query: string, opts: { companyIds?: string[]; companyId?: string; country?: string } = {}): SearchHit[] {
+  const q = query.slice(0, MAX_QUERY_CHARS);
+  const terms = q.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter((t) => t.length > 1 && !STOP.has(t)).slice(0, MAX_QUERY_TERMS);
   if (!terms.length) return [];
   const db = getDb();
   const hits: SearchHit[] = [];
