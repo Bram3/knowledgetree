@@ -33,9 +33,9 @@ const { seed } = await import("../src/lib/seed.ts");
 const cacheKeyFor = (purpose: string, input: string) => `${purpose}:${crypto.createHash("sha256").update(input.trim()).digest("hex").slice(0, 32)}`;
 const mailText = (id: string) => mailIngestInput(DEMO_MAILS.find((m) => m.id === id)!).text;
 const teamsText = (id: string) => DEMO_TEAMS_MESSAGES.find((m) => m.id === id)!.text;
-// Demo call (ticket #6): the transcript is keyed on the base64 audio, the leaves on the transcript.
+// Demo call (ticket #6): leaves keyed on the shipped transcript. Transcripts themselves are never cached: without
+// Vertex the call falls back to this file (src/lib/demo-call.ts).
 const demoDir = path.join(import.meta.dirname, "../public/demo");
-const callAudio = fs.readFileSync(path.join(demoDir, "nike-call.mp3")).toString("base64");
 const callTranscript = fs.readFileSync(path.join(demoDir, "nike-call-transcript.txt"), "utf8");
 
 type CachedLeaf = { type: string; statement: string; why: string | null; quote: string; people: string[]; confidence: number; nodeId: string | null; category: string };
@@ -78,7 +78,6 @@ leavesFor(teamsText("m3"), "teams", "Sofie De Smet", [
 ]);
 
 // Demo call Lena ↔ Katrin (ticket #6). Transcript = the script the audio was generated from; small talk gives no leaves.
-RESPONSES.push({ purpose: "transcript", input: callAudio, response: callTranscript.trim() });
 leavesFor(callTranscript, "call", "Katrin Vogel", [
   { type: "change", statement: "From next month the payroll cutoff for Nike Deutschland GmbH moves from the 15th to the 20th.", why: null, quote: "From next month, the payroll cutoff for Nike Deutschland GmbH moves from the fifteenth to the twentieth.", people: ["Katrin Vogel"], confidence: 0.93, nodeId: "nk-de-gmbh", category: "payroll" },
   { type: "attention", statement: "Bonus changes at Nike Deutschland GmbH need approval from the Betriebsrat (works council) first.", why: "German co-determination: the works council must approve bonus changes.", quote: "bonus changes need approval from the Betriebsrat first, our works council.", people: ["Katrin Vogel"], confidence: 0.9, nodeId: "nk-de-gmbh", category: "payroll" },

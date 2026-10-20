@@ -1,4 +1,4 @@
-import { generate, cacheKeyFor, type ModelClient } from "./gemini";
+import { generate, geminiConfig, type ModelClient } from "./gemini";
 import { ingest, type IngestDeps, type IngestInput, type IngestResult } from "./ingest";
 import type { Person } from "./types";
 
@@ -12,23 +12,24 @@ export type Audio = { mimeType: string; data: string }; // data = base64
 
 export type AudioIngestInput = Omit<IngestInput, "text"> & {
   audio: Audio;
-  /** Used when transcription fails and nothing is cached, e.g. the script that ships with the demo audio. */
+  /** Used when transcription fails (transcripts are never cached), e.g. the script that ships with the demo audio. */
   fallbackTranscript?: string;
 };
 
 export type AudioIngestResult = IngestResult & { transcriptFrom: "model" | "cache" | "fallback" | "none" };
 
-/** Transcribe audio with Gemini (cache fallback). Returns null if the model fails and nothing is cached. */
+/**
+ * Transcribe audio with Gemini. A transcript is never cached (it is the whole conversation), so this returns
+ * null when the model fails; the caller falls back to its own transcript, if it has one.
+ */
 export async function transcribe(audio: Audio, deps: { model?: ModelClient } = {}) {
-  return generate(
-    { system: TRANSCRIBE_SYSTEM, parts: [{ inlineData: audio }, { text: "Transcribe this recording." }] },
-    { cacheKey: cacheKeyFor("transcript", audio.data), client: deps.model },
-  );
+  return generate({ system: TRANSCRIBE_SYSTEM, parts: [{ inlineData: audio }, { text: "Transcribe this recording." }] }, { cacheKey: null, client: deps.model });
 }
 
 export async function ingestAudio(user: Person, input: AudioIngestInput, deps: IngestDeps = {}): Promise<AudioIngestResult> {
   const { audio, fallbackTranscript, ...rest } = input;
-  const t = await transcribe(audio, deps);
+  // GEMINI_PREFER_CACHE (identical demo takes): the shipped transcript, so the leaves come from the cache too.
+  const t = geminiConfig().preferCache && fallbackTranscript?.trim() ? null : await transcribe(audio, deps);
   const text = t?.text.trim() ? t.text : fallbackTranscript;
   if (!text?.trim()) return { leaves: [], reconfirmed: [], companyId: null, transcriptFrom: "none" };
   const res = await ingest(user, { ...rest, text }, deps);

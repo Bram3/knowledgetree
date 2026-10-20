@@ -11,6 +11,7 @@ import { endDemoCall, ingestText, undoLeaves } from "./leaf-actions";
 import { AccessDeniedError } from "./access";
 import { DEMO_MAILS, mailIngestInput } from "./demo-mails";
 import type { ModelClient, ModelRequest } from "./gemini";
+import bundledCache from "./gemini-cache.json";
 
 // Vertex unreachable (it has been answering 429): every model call fails, so the committed cache answers. No network.
 delete process.env.GOOGLE_CLOUD_PROJECT;
@@ -118,6 +119,22 @@ describe("ingestAudio (shared by the call and the voice note)", () => {
     expect(seen[0].parts).toContainEqual({ inlineData: unknownAudio });
     expect(res.leaves).toHaveLength(1);
     expect(res.leaves[0]).toMatchObject({ quote: "Jonas handled the Betriebsrat approval", nodeId: "nk-de-gmbh", source: { ref: "call:live" } });
+  });
+
+  it("never keeps a transcript: not in the runtime cache, not in the committed one", async () => {
+    const model: ModelClient = {
+      generate: async (req) => (req.parts.some((p) => "inlineData" in p) ? "Katrin: Jonas handled the Betriebsrat approval last year." : JSON.stringify({ leaves: [] })),
+    };
+    await ingestAudio(lena(), { ...input, ref: "call:private", fallbackTranscript: transcript }, { model });
+    const runtimeFile = path.join(process.env.KT_DATA_DIR!, "gemini-cache.json");
+    const runtime = fs.existsSync(runtimeFile) ? JSON.parse(fs.readFileSync(runtimeFile, "utf8")) : {};
+    expect(Object.keys(runtime).filter((k) => k.startsWith("transcript:"))).toEqual([]);
+    expect(JSON.stringify(runtime)).not.toContain("Betriebsrat approval last year");
+    expect(Object.keys(bundledCache).filter((k) => k.startsWith("transcript:"))).toEqual([]);
+  });
+
+  it("with Vertex down, the demo call is transcribed from the shipped script", async () => {
+    expect((await ingestDemoCall(lena(), { model: down })).transcriptFrom).toBe("fallback");
   });
 
   it("grows nothing when there is no transcript at all", async () => {

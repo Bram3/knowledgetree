@@ -19,7 +19,7 @@ export const DEMO_CALL = {
 
 const demoFile = (name: string) => path.join(process.cwd(), "public", "demo", name);
 
-/** Audio of the demo call as base64 (the cache key for its transcript). */
+/** Audio of the demo call as base64, sent inline to Gemini for transcription. */
 export async function demoCallAudio() {
   return { mimeType: DEMO_CALL.mimeType, data: (await fs.readFile(demoFile("nike-call.mp3"))).toString("base64") };
 }

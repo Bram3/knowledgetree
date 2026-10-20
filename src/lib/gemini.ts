@@ -91,21 +91,22 @@ export type Generated = { text: string; from: "model" | "cache" };
 /**
  * Ask the model, with timeout and cache fallback.
  * `cacheKey` identifies the input (use `cacheKeyFor(purpose, input)`); a successful answer is stored under it.
+ * `cacheKey: null` is for answers that must never be kept, such as a transcript of a call: no cache read or write.
  * Returns null when the model fails and nothing is cached.
  */
-export async function generate(req: ModelRequest, opts: { cacheKey: string; client?: ModelClient; timeoutMs?: number }): Promise<Generated | null> {
+export async function generate(req: ModelRequest, opts: { cacheKey: string | null; client?: ModelClient; timeoutMs?: number }): Promise<Generated | null> {
   const cfg = geminiConfig();
-  if (cfg.preferCache) {
+  if (cfg.preferCache && opts.cacheKey) {
     const hit = readCache(opts.cacheKey);
     if (hit !== undefined) return { text: hit, from: "cache" };
   }
   const client = opts.client ?? vertexClient(cfg);
   try {
     const text = await withTimeout(opts.timeoutMs ?? cfg.timeoutMs, (signal) => client.generate({ ...req, signal }));
-    writeCache(opts.cacheKey, text);
+    if (opts.cacheKey) writeCache(opts.cacheKey, text);
     return { text, from: "model" };
   } catch (err) {
-    const hit = readCache(opts.cacheKey);
+    const hit = opts.cacheKey ? readCache(opts.cacheKey) : undefined;
     if (hit !== undefined) return { text: hit, from: "cache" };
     if (!(err instanceof ModelUnavailableError)) console.warn("Gemini call failed and no cached response:", (err as Error).message);
     return null;
