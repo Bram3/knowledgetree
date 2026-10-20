@@ -4,6 +4,8 @@ import { ingest } from "./ingest";
 import { leavesForNode } from "./leaves";
 import { getDb, resetDb, person } from "./db";
 import type { ModelClient, ModelRequest } from "./gemini";
+import { DEMO_MAILS, mailIngestInput } from "./demo-mails";
+import { DEMO_TEAMS_MESSAGES, teamsReactionInput } from "./demo-teams";
 
 /**
  * COMPARE at ingest: a new leaf is matched against the notes and live leaves on its node › category.
@@ -67,5 +69,71 @@ describe("compare at ingest", () => {
 
     expect(leaves).toMatchObject([{ status: "conflict", conflictsWith: "i-nk-de-cutoff-new", conflictClaims: { said: "the 20th", noted: "the 18th" } }]);
     expect(leavesForNode("nk-de-gmbh")).toMatchObject([{ status: "conflict" }]);
+  });
+});
+
+describe("the demo flows work from the committed cache (Vertex down)", () => {
+  const down: ModelClient = { generate: async () => { throw new Error("ECONNREFUSED"); } };
+  const mailById = (id: string) => mailIngestInput(DEMO_MAILS.find((m) => m.id === id)!);
+  const sofie = DEMO_TEAMS_MESSAGES.find((m) => m.id === "m3")!;
+
+  it("Katrin's mail (18th) and then Sofie's 🍃 in Teams (18th) make one leaf ×2", async () => {
+    const first = await ingest(lena(), mailById("e1"), { model: down });
+    const change = first.leaves.find((l) => l.type === "change")!;
+    const res = await ingest(lena(), teamsReactionInput(sofie), { model: down });
+    expect(res.reconfirmed).toMatchObject([{ id: change.id, reconfirmedAt: [expect.any(String)] }]);
+    expect(leavesForNode("nk-de-gmbh").filter((l) => l.type === "change")).toHaveLength(1);
+  });
+
+  it("the other way round too: Sofie's 🍃 first, then Katrin's mail", async () => {
+    const first = await ingest(lena(), teamsReactionInput(sofie), { model: down });
+    const change = first.leaves.find((l) => l.type === "change")!;
+    const res = await ingest(lena(), mailById("e1"), { model: down });
+    expect(res.reconfirmed).toMatchObject([{ id: change.id }]);
+  });
+
+  it("Katrin's confirmation of the 20th conflicts with Jonas's note when nothing else was caught yet", async () => {
+    const { leaves } = await ingest(lena(), mailById("e7"), { model: down });
+    expect(leaves).toMatchObject([{ status: "conflict", conflictsWith: "i-nk-de-cutoff-new", conflictClaims: { said: "the 20th", noted: "the 18th" } }]);
+  });
+});
+
+describe("reconfirmation", () => {
+  it("a later mail from Katrin confirming the 20th shows ×2 on the existing leaf and creates no new one", async () => {
+    const [callLeaf] = (await ingest(lena(), callInput, { model: fakeModel([call20], demoJudge).client })).leaves;
+    const res = await ingest(lena(), mailInput, { model: fakeModel([mail20], demoJudge).client });
+
+    expect(res.leaves).toEqual([]);
+    expect(res.reconfirmed).toMatchObject([{ id: callLeaf.id, reconfirmedAt: [expect.any(String)] }]);
+    const onNode = leavesForNode("nk-de-gmbh");
+    expect(onNode).toHaveLength(1);
+    expect(onNode[0]).toMatchObject({ id: callLeaf.id, reconfirmedBy: [{ channel: "mail", ref: "outlook:e7" }] });
+  });
+
+  it("re-opening the confirming mail does not count it twice", async () => {
+    await ingest(lena(), callInput, { model: fakeModel([call20], demoJudge).client });
+    await ingest(lena(), mailInput, { model: fakeModel([mail20], demoJudge).client });
+    const again = fakeModel([mail20], demoJudge);
+    const res = await ingest(lena(), mailInput, { model: again.client });
+
+    expect(again.calls).toEqual([]);
+    expect(res.reconfirmed).toHaveLength(1);
+    expect(leavesForNode("nk-de-gmbh")[0].reconfirmedAt).toHaveLength(1);
+  });
+
+  it("an unusable comparison answer counts as a new leaf", async () => {
+    const garbage: ModelClient = { generate: async (req) => (JSON.stringify(req.schema).includes('"relation"') ? "not json" : JSON.stringify({ leaves: [call20] })) };
+    const { leaves } = await ingest(lena(), callInput, { model: garbage });
+    expect(leaves).toMatchObject([{ status: "auto" }]);
+  });
+
+  it("the conflict and the reconfirmation appear in the Changes feed, with names", async () => {
+    await ingest(lena(), callInput, { model: fakeModel([call20], demoJudge).client });
+    await ingest(lena(), mailInput, { model: fakeModel([mail20], demoJudge).client });
+    const feed = getDb().activity.filter((a) => a.action === "leaf_conflict" || a.action === "leaf_reconfirmed");
+    expect(feed).toMatchObject([
+      { action: "leaf_conflict", actorId: "lena", itemId: "i-nk-de-cutoff-new", summary: expect.stringMatching(/Katrin Vogel.*Jonas Becker/) },
+      { action: "leaf_reconfirmed", actorId: "lena", summary: expect.stringMatching(/Katrin Vogel.*×2/) },
+    ]);
   });
 });

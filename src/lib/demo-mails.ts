@@ -15,6 +15,14 @@ export type DemoMail = {
 };
 
 export const DEMO_MAILS: DemoMail[] = [
+  // Scene 3: the day after the call, Katrin confirms the 20th in writing. Reconfirms the call's leaf (×2).
+  { id: "e7", from: "Katrin Vogel", email: "katrin.vogel@nike.com", subject: "RE: Payroll cutoff Nike Deutschland GmbH", time: "09:02", preview: "Hi Lena, as discussed on the phone: the cutoff is the 20th from next month…", body: `Hi Lena,
+
+As discussed on the phone: from next month the payroll cutoff for variable input at Nike Deutschland GmbH is the 20th. Pay date stays the 25th.
+
+Thanks for picking this up so quickly.
+
+Katrin`, unread: true },
   { id: "e1", from: "Katrin Vogel", email: "katrin.vogel@nike.com", subject: "Updated payroll calendar Q4 2026 – Nike Deutschland GmbH", time: "08:41", preview: "Hi Lena, as discussed with Sofie, please find attached the new payroll calendar…", body: `Hi Lena,
 
 As discussed with Sofie, please find attached the new payroll calendar for Nike Deutschland GmbH for Q4 2026.

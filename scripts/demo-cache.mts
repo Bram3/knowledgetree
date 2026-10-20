@@ -13,6 +13,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { DEMO_MAILS, mailIngestInput } from "../src/lib/demo-mails.ts";
 import { DEMO_TEAMS_MESSAGES } from "../src/lib/demo-teams.ts";
+import { compareText, describeLeaf, describeNote } from "../src/lib/compare-prompt.ts";
+import { seed } from "../src/lib/seed.ts";
 
 const cacheKeyFor = (purpose: string, input: string) => `${purpose}:${crypto.createHash("sha256").update(input.trim()).digest("hex").slice(0, 32)}`;
 const mailText = (id: string) => mailIngestInput(DEMO_MAILS.find((m) => m.id === id)!).text;
@@ -63,6 +65,36 @@ const RESPONSES: { purpose: string; input: string; response: unknown }[] = [
     ] },
   },
 ];
+
+// Katrin confirms the 20th by mail (scene 3). Without the call this conflicts with Jonas's note on its own.
+const e7Leaf = { type: "change", statement: "From next month the payroll cutoff for variable input at Nike Deutschland GmbH is the 20th; pay date stays the 25th.", why: null, quote: "from next month the payroll cutoff for variable input at Nike Deutschland GmbH is the 20th", people: ["Katrin Vogel"], confidence: 0.92, nodeId: "nk-de-gmbh", category: "payroll" };
+RESPONSES.push({ purpose: "leaves", input: mailText("e7"), response: { leaves: [e7Leaf] } });
+
+// COMPARE (ticket #8): one entry per pair, see src/lib/compare-prompt.ts. A key only depends on the two texts,
+// so it holds whatever else hangs on the node. Pairs not listed count as "unrelated" when Vertex is down.
+// The call's leaf (scene 1) is not here yet: once its extraction is in this file, add its pairs below
+// (vs Jonas's note: contradicts "the 20th"/"the 18th"; e7 vs the call leaf: same), or copy the "compare:"
+// entries from data/gemini-cache.json after one live run.
+type CachedLeaf = { type: string; statement: string; quote: string };
+const leafFrom = (input: string, type: string) => (RESPONSES.find((r) => r.purpose === "leaves" && r.input === input)!.response as { leaves: CachedLeaf[] }).leaves.find((l) => l.type === type)!;
+const jonasNote = seed.items.find((i) => i.id === "i-nk-de-cutoff-new")!;
+const e1Change = { ...leafFrom(mailText("e1"), "change"), channel: "mail", saidBy: "Katrin Vogel" };
+const m3Change = { ...leafFrom(teamsText("m3"), "change"), channel: "teams", saidBy: "Sofie De Smet" };
+const e7Change = { ...e7Leaf, channel: "mail", saidBy: "Katrin Vogel" };
+const same = { relation: "same", said: null, noted: null };
+const twentieth = { relation: "contradicts", said: "the 20th", noted: "the 18th" };
+RESPONSES.push(
+  // Katrin's mail and Sofie's message say the same thing (the 18th), in either order: one leaf ×2.
+  { purpose: "compare", input: compareText(m3Change, describeLeaf(e1Change)), response: same },
+  { purpose: "compare", input: compareText(e1Change, describeLeaf(m3Change)), response: same },
+  // Both agree with Jonas's note.
+  { purpose: "compare", input: compareText(e1Change, describeNote(jonasNote)), response: same },
+  { purpose: "compare", input: compareText(m3Change, describeNote(jonasNote)), response: same },
+  // The 20th contradicts Jonas's note (the 18th) and the earlier leaves.
+  { purpose: "compare", input: compareText(e7Change, describeNote(jonasNote)), response: twentieth },
+  { purpose: "compare", input: compareText(e7Change, describeLeaf(e1Change)), response: twentieth },
+  { purpose: "compare", input: compareText(e7Change, describeLeaf(m3Change)), response: twentieth },
+);
 
 const file = path.join(import.meta.dirname, "../src/lib/gemini-cache.json");
 const cache: Record<string, string> = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
