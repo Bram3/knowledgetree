@@ -89,7 +89,7 @@ export async function answerConflict(leafId: string, choice: ConflictChoice, asP
   const leaf = typeof leafId === "string" ? getLeaf(leafId) : null;
   if (!leaf) throw new AccessDeniedError();
   assertNodeAccess(user, leaf.nodeId);
-  const out = resolveConflict(viewAs(user, asPersonId), leafId, choice);
+  const out = resolveConflict(viewAs(user, asPersonId), leafId, choice, { actor: user });
   revalidatePath("/", "layout");
   return out;
 }

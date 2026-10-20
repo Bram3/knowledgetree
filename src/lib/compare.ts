@@ -154,8 +154,11 @@ export const CONFLICT_CHOICES: readonly ConflictChoice[] = ["correct", "keep", "
  * - keep: the leaf falls.
  * - unsure: the conflict leaves the owner's cards and waits in the digest.
  * Answering a conflict that is already resolved changes nothing. Throws AccessDeniedError otherwise.
+ * `actor` is who actually tapped (the signed-in user "viewing as" the owner): versions and Changes record them,
+ * with "on behalf of <owner>" when that is not the owner.
  */
-export function resolveConflict(owner: Person, leafId: string, choice: ConflictChoice, now = new Date()): Leaf {
+export function resolveConflict(owner: Person, leafId: string, choice: ConflictChoice, opts: { actor?: Person; now?: Date } = {}): Leaf {
+  const actor = opts.actor ?? owner;
   const leaf = getDb().leaves.find((l) => l.id === leafId);
   if (!leaf) throw new AccessDeniedError();
   assertNodeAccess(owner, leaf.nodeId);
@@ -164,7 +167,8 @@ export function resolveConflict(owner: Person, leafId: string, choice: ConflictC
   if (leaf.status !== "conflict") return leaf;
   if (choice === "unsure" && leaf.deferredAt) return leaf;
 
-  const at = now.toISOString();
+  const at = (opts.now ?? new Date()).toISOString();
+  const behalf = actor.id === owner.id ? "" : ` on behalf of ${owner.name}`;
   let out = leaf;
   saveDb((db) => {
     const l = db.leaves.find((x) => x.id === leafId)!;
@@ -172,21 +176,21 @@ export function resolveConflict(owner: Person, leafId: string, choice: ConflictC
     const c = l.conflictClaims ?? { said: l.statement, noted: it.title };
     const who = saidBy(l.source);
     if (choice === "correct") {
-      const reason = `${who} said ${c.said} (${l.source.channel}, ${day(l.source.at)}): "${l.quote}"`;
+      const reason = `${who} said ${c.said} (${l.source.channel}, ${day(l.source.at)}): "${l.quote}"${behalf ? `. Corrected by ${actor.name}${behalf}` : ""}`;
       Object.assign(it, correctedNote(it, { statement: l.statement, channel: l.source.channel, saidBy: who }, c));
-      it.versions.push({ version: it.versions.length + 1, byId: owner.id, at, note: reason, source: { ...l.source, leafId: l.id } });
+      it.versions.push({ version: it.versions.length + 1, byId: actor.id, at, note: reason, source: { ...l.source, leafId: l.id } });
       it.updatedAt = at;
       it.verifiedById = owner.id;
       it.verifiedAt = at;
       l.status = "verified";
       l.verifiedById = owner.id;
-      log(db, "new_version", it.nodeId, owner.id, `corrected "${it.title}" to version ${it.versions.length}: ${who} said ${c.said} (${l.source.channel})`, it.id);
+      log(db, "new_version", it.nodeId, actor.id, `corrected "${it.title}" to version ${it.versions.length}${behalf}: ${who} said ${c.said} (${l.source.channel})`, it.id);
     } else if (choice === "keep") {
       l.status = "fallen";
-      log(db, "leaf_kept", it.nodeId, owner.id, `kept "${it.title}" (${c.noted}). The ${l.source.channel} leaf from ${who} (${c.said}) fell`, it.id);
+      log(db, "leaf_kept", it.nodeId, actor.id, `kept "${it.title}" (${c.noted})${behalf}. The ${l.source.channel} leaf from ${who} (${c.said}) fell`, it.id);
     } else {
       l.deferredAt = at;
-      log(db, "leaf_deferred", it.nodeId, owner.id, `was not sure about ${c.said} vs ${c.noted} for "${it.title}". It waits in the digest`, it.id);
+      log(db, "leaf_deferred", it.nodeId, actor.id, `was not sure about ${c.said} vs ${c.noted} for "${it.title}"${behalf}. It waits in the digest`, it.id);
     }
     out = structuredClone(l);
   });
