@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDb, saveDb, resetDb, uid, detectNode, detectTopic, search, person, nodePath, company, categoryForTopic } from "./db";
@@ -9,6 +8,7 @@ import { requireCustomerAccess, requireItemAccess, requireCompanyAccess, AccessD
 import type { Item, ActivityAction, Person } from "./types";
 import { storeUpload } from "./uploads";
 import { assertLinkableFile } from "./files";
+import { revalidateAll } from "./revalidate";
 
 async function actor() {
   const u = await getCurrentUser();
@@ -19,10 +19,6 @@ async function actor() {
 function log(db: ReturnType<typeof getDb>, action: ActivityAction, nodeId: string, summary: string, actorId: string, itemId?: string) {
   const n = db.nodes.find((x) => x.id === nodeId)!;
   db.activity.push({ id: uid("a"), at: new Date().toISOString(), actorId, action, companyId: n.companyId, nodeId, itemId, summary });
-}
-
-function revalidateAll() {
-  revalidatePath("/", "layout");
 }
 
 // ---------- auth ----------

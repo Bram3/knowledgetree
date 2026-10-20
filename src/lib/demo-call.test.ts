@@ -10,6 +10,7 @@ import { seed } from "./seed";
 import { conflictCards, endDemoCall, ingestText, undoLeaves } from "./leaf-actions";
 import { getDb } from "./db";
 import { AccessDeniedError } from "./access";
+import { ValidationError } from "./validation";
 import { DEMO_MAILS, mailIngestInput } from "./demo-mails";
 import type { ModelClient, ModelRequest } from "./gemini";
 import bundledCache from "./gemini-cache.json";
@@ -101,8 +102,9 @@ describe("hanging up and undo (server actions)", () => {
   });
 
   it("rejects ids that are not a list of strings", async () => {
-    await expect(undoLeaves("l1" as never)).rejects.toThrow();
-    await expect(undoLeaves(["nope"])).rejects.toBeInstanceOf(AccessDeniedError);
+    await expect(undoLeaves("l1" as never)).rejects.toBeInstanceOf(ValidationError);
+    await expect(undoLeaves([1] as never)).rejects.toBeInstanceOf(ValidationError);
+    await expect(undoLeaves(["nope"])).rejects.toBeInstanceOf(AccessDeniedError); // well-formed but unknown
   });
 });
 

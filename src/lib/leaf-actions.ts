@@ -1,15 +1,15 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { requireUser } from "./auth";
+import { canAccess, requireUser, sharesCustomer } from "./auth";
 import { getDb, node, nodePath, person } from "./db";
 import { ingest, validateIngestInput, type IngestResult } from "./ingest";
 import { ingestDemoCall } from "./demo-call";
-import { getLeaf, leavesFromSource, removeLeaves } from "./leaves";
-import { AccessDeniedError, assertNodeAccess } from "./access";
+import { leavesFromSource, removeLeaves } from "./leaves";
+import { AccessDeniedError, requireLeafAccess } from "./access";
 import { conflictCardsFor, resolveConflict, leavesReconfirmedBy, notesReconfirmedBy, CONFLICT_CHOICES, type ConflictCard, type ConflictChoice, type ReconfirmedNote } from "./compare";
 import { DEMO_TEAMS_MESSAGES, teamsReactionInput } from "./demo-teams";
-import { canAccess } from "./auth";
+import { revalidateAll } from "./revalidate";
+import { idList, idString, ValidationError } from "./validation";
 import type { Leaf, Person } from "./types";
 
 export type IngestedLeaf = Leaf & { path: string[] };
@@ -39,7 +39,7 @@ export async function endDemoCall(): Promise<Ingested> {
 
 /** Refresh the tree when a message grew or reconfirmed something. */
 function grown(res: Ingested): Ingested {
-  if (res.leaves.length || res.reconfirmed.length || res.reconfirmedNotes.length) revalidatePath("/", "layout");
+  if (res.leaves.length || res.reconfirmed.length || res.reconfirmedNotes.length) revalidateAll();
   return res;
 }
 
@@ -73,17 +73,17 @@ const MAX_UNDO = 10;
  * Undo from the "🍃 n leaves caught" toast: delete leaves the signed-in user just caught.
  * Only the person who caught a leaf may undo it, and only on a customer they still have access to.
  * All or nothing: one foreign or unknown id throws AccessDeniedError and nothing is removed.
+ * Ids that aren't a short list of strings throw ValidationError.
  */
 export async function undoLeaves(ids: unknown): Promise<void> {
-  const user = await requireUser();
-  if (!Array.isArray(ids) || ids.length > MAX_UNDO || !ids.every((id) => typeof id === "string")) throw new AccessDeniedError("Bad leaf ids");
-  for (const id of ids) {
-    const leaf = getLeaf(id);
-    if (!leaf || leaf.source.byId !== user.id) throw new AccessDeniedError();
-    assertNodeAccess(user, leaf.nodeId);
+  await requireUser();
+  const leafIds = idList(ids, MAX_UNDO, "leaf ids");
+  for (const id of leafIds) {
+    const { user, leaf } = await requireLeafAccess(id);
+    if (leaf.source.byId !== user.id) throw new AccessDeniedError();
   }
-  removeLeaves(ids);
-  revalidatePath("/", "layout");
+  removeLeaves(leafIds);
+  revalidateAll();
 }
 
 // ---------- conflicts: one card for the owner, one tap ----------
@@ -94,8 +94,8 @@ export async function undoLeaves(ids: unknown): Promise<void> {
  */
 function viewAs(user: Person, asPersonId?: string): Person {
   if (asPersonId === undefined || asPersonId === user.id) return user;
-  const p = typeof asPersonId === "string" ? person(asPersonId) : undefined;
-  if (!p || !p.customerIds.some((c) => user.customerIds.includes(c))) throw new AccessDeniedError();
+  const p = person(idString(asPersonId, "person id"));
+  if (!p || !sharesCustomer(user, p)) throw new AccessDeniedError();
   return p;
 }
 
@@ -103,7 +103,7 @@ function viewAs(user: Person, asPersonId?: string): Person {
 export async function viewAsOptions(): Promise<{ id: string; name: string; me: boolean }[]> {
   const user = await requireUser();
   return getDb().people
-    .filter((p) => p.id === user.id || p.customerIds.some((c) => user.customerIds.includes(c)))
+    .filter((p) => p.id === user.id || sharesCustomer(user, p))
     .map((p) => ({ id: p.id, name: p.name, me: p.id === user.id }));
 }
 
@@ -115,12 +115,9 @@ export async function conflictCards(asPersonId?: string): Promise<ConflictCard[]
 
 /** The owner's one tap on a conflict card: "correct" | "keep" | "unsure". Only the note's owner may answer. */
 export async function answerConflict(leafId: string, choice: ConflictChoice, asPersonId?: string): Promise<Leaf> {
-  const user = await requireUser();
-  if (!CONFLICT_CHOICES.includes(choice)) throw new Error("Unknown answer");
-  const leaf = typeof leafId === "string" ? getLeaf(leafId) : null;
-  if (!leaf) throw new AccessDeniedError();
-  assertNodeAccess(user, leaf.nodeId);
+  const { user } = await requireLeafAccess(idString(leafId, "leaf id"));
+  if (!CONFLICT_CHOICES.includes(choice)) throw new ValidationError("Unknown answer");
   const out = resolveConflict(viewAs(user, asPersonId), leafId, choice, { actor: user });
-  revalidatePath("/", "layout");
+  revalidateAll();
   return out;
 }

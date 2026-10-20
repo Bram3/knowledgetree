@@ -1,6 +1,7 @@
 import { requireUser, canAccess } from "./auth";
 import { company, getDb, node } from "./db";
-import type { Item, OrgNode, Person } from "./types";
+import { getLeaf } from "./leaves";
+import type { Item, Leaf, OrgNode, Person } from "./types";
 
 /**
  * Access checks for server actions and routes. Every function that reads or changes
@@ -37,6 +38,19 @@ export function assertCompanyAccess(user: Person, companyId: string) {
   const c = company(companyId);
   if (!c || !canAccess(user, c.id)) throw new AccessDeniedError();
   return c;
+}
+
+/** Throws unless `user` is assigned to the customer the leaf hangs on. Pure (no request scope). */
+export function assertLeafAccess(user: Person, leafId: string): { leaf: Leaf; node: OrgNode } {
+  const leaf = getLeaf(leafId);
+  if (!leaf) throw new AccessDeniedError();
+  return { leaf, node: assertNodeAccess(user, leaf.nodeId) };
+}
+
+/** Signed-in user who may access the customer `leafId` hangs on. */
+export async function requireLeafAccess(leafId: string): Promise<{ user: Person; leaf: Leaf; node: OrgNode }> {
+  const user = await requireUser();
+  return { user, ...assertLeafAccess(user, leafId) };
 }
 
 /** Signed-in user who may access the customer owning `nodeId`. */
