@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "generate:files": "python3 scripts/generate_files.py",
     "docker:build": "docker build -t knowledgetree .",
     "docker:run": "docker run --rm -p 8080:8080 knowledgetree"
@@ -30,7 +32,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.7",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.5"
   },
   "packageManager": "pnpm@11.24.0"
 }

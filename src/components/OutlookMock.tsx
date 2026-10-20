@@ -71,7 +71,7 @@ export function OutlookMock() {
 
 function AddInPane({ sel }: { sel: (typeof mails)[number] }) {
   const [suggest, setSuggest] = useState<Awaited<ReturnType<typeof suggestNode>>>(null);
-  const [summary, setSummary] = useState<Awaited<ReturnType<typeof nodeSummary>>>(null);
+  const [summary, setSummary] = useState<Awaited<ReturnType<typeof nodeSummary>> | null>(null);
   const [saved, setSaved] = useState<{ what: string; href: string }[]>([]);
   const [pending, start] = useTransition();
 
