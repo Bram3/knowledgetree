@@ -94,6 +94,7 @@ export type Activity = {
   companyId: string;
   nodeId: string;
   itemId?: string;
+  leafId?: string; // the new leaf this entry is about (e.g. leaf_conflict), so undoing the leaf removes it too
   summary: string;
 };
 

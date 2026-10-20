@@ -7,7 +7,8 @@ import { ingestDemoCall } from "./demo-call";
 import { ingestAudio } from "./audio-ingest";
 import { leavesForCompany } from "./leaves";
 import { seed } from "./seed";
-import { endDemoCall, ingestText, undoLeaves } from "./leaf-actions";
+import { conflictCards, endDemoCall, ingestText, undoLeaves } from "./leaf-actions";
+import { getDb } from "./db";
 import { AccessDeniedError } from "./access";
 import { DEMO_MAILS, mailIngestInput } from "./demo-mails";
 import type { ModelClient, ModelRequest } from "./gemini";
@@ -77,6 +78,16 @@ describe("hanging up and undo (server actions)", () => {
     const call = await endDemoCall();
     await undoLeaves(call.leaves.map((l) => l.id));
     expect(caught().map((l) => l.id).sort()).toEqual(mail.leaves.map((l) => l.id).sort());
+  });
+
+  it("undo also takes back what the leaves set off: the conflict in Changes and Jonas's card", async () => {
+    const activityBefore = getDb().activity.length;
+    const call = await endDemoCall();
+    expect(getDb().activity.filter((a) => a.action === "leaf_conflict")).toHaveLength(1);
+    expect(await conflictCards("jonas")).toHaveLength(1);
+    await undoLeaves(call.leaves.map((l) => l.id));
+    expect(getDb().activity).toHaveLength(activityBefore);
+    expect(await conflictCards("jonas")).toEqual([]);
   });
 
   it("someone else can't undo Lena's leaves, not even with access to Nike", async () => {

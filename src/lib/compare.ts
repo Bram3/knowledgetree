@@ -74,7 +74,7 @@ export function recordCompare(user: Person, outcome: CompareOutcome): Leaf[] {
       if (l.status !== "conflict") continue;
       const note = db.items.find((i) => i.id === l.conflictsWith);
       const owner = person(note?.ownerId);
-      log(db, "leaf_conflict", l.nodeId, user.id, `caught a ${l.source.channel} from ${saidBy(l.source)} that conflicts with "${note?.title}": ${l.conflictClaims?.said} vs ${l.conflictClaims?.noted}.${owner ? ` Asked ${owner.name}.` : ""}`, note?.id);
+      log(db, "leaf_conflict", l.nodeId, user.id, `caught a ${l.source.channel} from ${saidBy(l.source)} that conflicts with "${note?.title}": ${l.conflictClaims?.said} vs ${l.conflictClaims?.noted}.${owner ? ` Asked ${owner.name}.` : ""}`, note?.id, l.id);
     }
   });
   return reconfirmed;
@@ -192,10 +192,10 @@ function parseJudgement(json: string | undefined): Judgement {
 
 // ---------- helpers ----------
 
-function log(db: Db, action: ActivityAction, nodeId: string, actorId: string, summary: string, itemId?: string) {
+function log(db: Db, action: ActivityAction, nodeId: string, actorId: string, summary: string, itemId?: string, leafId?: string) {
   const n = db.nodes.find((x) => x.id === nodeId);
   if (!n) return;
-  db.activity.push({ id: uid("a"), at: new Date().toISOString(), actorId, action, companyId: n.companyId, nodeId, itemId, summary });
+  db.activity.push({ id: uid("a"), at: new Date().toISOString(), actorId, action, companyId: n.companyId, nodeId, itemId, ...(leafId ? { leafId } : {}), summary });
 }
 
 /** "Katrin Vogel <katrin@…>" → "Katrin Vogel"; without a sender, the person who captured it. */
