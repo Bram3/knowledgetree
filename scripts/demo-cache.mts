@@ -6,15 +6,17 @@
  *
  * Keys must match `cacheKeyFor(purpose, input)` in src/lib/gemini.ts; src/lib/ingest.test.ts checks the demo mails.
  * Entries already in the file are kept, so you can also paste real Vertex answers from data/gemini-cache.json.
- * Later channels (call, Teams) add their own entries to RESPONSES below.
+ * Later channels (call, ...) add their own entries to RESPONSES below. src/lib/demo-teams.test.ts checks the Teams chat.
  */
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { DEMO_MAILS, mailIngestInput } from "../src/lib/demo-mails.ts";
+import { DEMO_TEAMS_MESSAGES } from "../src/lib/demo-teams.ts";
 
 const cacheKeyFor = (purpose: string, input: string) => `${purpose}:${crypto.createHash("sha256").update(input.trim()).digest("hex").slice(0, 32)}`;
 const mailText = (id: string) => mailIngestInput(DEMO_MAILS.find((m) => m.id === id)!).text;
+const teamsText = (id: string) => DEMO_TEAMS_MESSAGES.find((m) => m.id === id)!.text;
 
 const RESPONSES: { purpose: string; input: string; response: unknown }[] = [
   {
@@ -47,6 +49,17 @@ const RESPONSES: { purpose: string; input: string; response: unknown }[] = [
     response: { leaves: [
       { type: "change", statement: "From next month the roster export of Hotel Amsterdam comes from a new planning tool.", why: null, quote: "From next month the roster export from Hotel Amsterdam comes from the new planning tool.", people: ["Joris Bakker"], confidence: 0.9, nodeId: "vv-nl-ams", category: "time" },
       { type: "promise", statement: "Joris Bakker will send the specification of the new roster export next week.", why: null, quote: "Specification attached next week.", people: ["Joris Bakker"], confidence: 0.78, nodeId: "vv-nl-ams", category: "time" },
+    ] },
+  },
+  // Teams chat with Sofie (🍃 reaction, ticket #7)
+  { purpose: "leaves", input: teamsText("m1"), response: { leaves: [] } },
+  { purpose: "leaves", input: teamsText("m2"), response: { leaves: [] } },
+  {
+    purpose: "leaves",
+    input: teamsText("m3"),
+    response: { leaves: [
+      { type: "change", statement: "From the October run the payroll cutoff at Nike Deutschland GmbH moves from the 15th to the 18th; pay date stays the 25th.", why: null, quote: "Nike Deutschland GmbH confirmed the payroll cutoff moves to the 18th from the October run (was the 15th). Pay date stays the 25th.", people: ["Sofie De Smet", "Katrin Vogel"], confidence: 0.88, nodeId: "nk-de-gmbh", category: "payroll" },
+      { type: "promise", statement: "Katrin Vogel will send the new Nike Germany payroll calendar by mail.", why: null, quote: "Katrin will send the new calendar by mail.", people: ["Katrin Vogel"], confidence: 0.7, nodeId: "nk-de-gmbh", category: "payroll" },
     ] },
   },
 ];
