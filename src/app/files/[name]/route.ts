@@ -1,7 +1,7 @@
 import { SEED_FILES_DIR, serveKnowledgeFile } from "@/lib/files";
 
 /** Seeded demo documents, served with the same customer access check as uploads. */
-export async function GET(_req: Request, { params }: { params: Promise<{ name: string }> }) {
+export async function GET(_req: Request, { params }: RouteContext<"/files/[name]">) {
   const { name } = await params;
   return serveKnowledgeFile(SEED_FILES_DIR, name, `/files/${name}`);
 }

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { signSession, verifySession } from "./session";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { sessionSecret, signSession, verifySession } from "./session";
 
 const SECRET = "test-secret-at-least-32-characters-long";
 
@@ -27,5 +27,28 @@ describe("session token", () => {
     expect(verifySession(undefined, SECRET)).toBeNull();
     expect(verifySession("", SECRET)).toBeNull();
     expect(verifySession("amelie.", SECRET)).toBeNull();
+  });
+});
+
+describe("session secret without SESSION_SECRET", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  const secretWith = (nodeEnv: string | undefined) => {
+    vi.stubEnv("SESSION_SECRET", "");
+    vi.stubEnv("NODE_ENV", nodeEnv);
+    return sessionSecret();
+  };
+
+  it("uses the fixed dev-only fallback in development and tests", () => {
+    expect(secretWith("development")).toBe(secretWith("test"));
+  });
+
+  it("anywhere else (production, staging, unset) uses a random per-process secret, never the dev one", () => {
+    const dev = secretWith("development");
+    for (const env of ["production", "staging", undefined]) {
+      const secret = secretWith(env);
+      expect(secret).not.toBe(dev);
+      expect(secret).toHaveLength(64);
+      expect(secretWith(env)).toBe(secret); // stable within the process
+    }
   });
 });
