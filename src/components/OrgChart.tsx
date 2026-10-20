@@ -7,11 +7,12 @@ import { useRouter } from "next/navigation";
 import { Building2, Globe2, Landmark, Layers, Users, ArrowDownLeft, ChevronRight } from "lucide-react";
 import type { OrgNode } from "@/lib/types";
 import type { NodeStats } from "@/lib/db";
+import type { LeafCount } from "@/lib/leaves";
 import type { Product } from "@/lib/catalog";
 import { COUNTRY_NAME } from "@/lib/format";
 
-export type ChartNodeData = { org: OrgNode; stats: NodeStats; categories: Product[]; selected: boolean; expanded: boolean };
-export type ProductNodeData = { product: Product; count: number; customerDocs: number; selected: boolean };
+export type ChartNodeData = { org: OrgNode; stats: NodeStats; categories: Product[]; selected: boolean; expanded: boolean; leaves: LeafCount };
+export type ProductNodeData = { product: Product; count: number; customerDocs: number; selected: boolean; leaves: number };
 
 const typeIcon = { group: Building2, country: Globe2, entity: Landmark, division: Layers, team: Users };
 const typeLabel = { group: "Group", country: "Country", entity: "Legal entity", division: "Division", team: "Team" };
@@ -43,6 +44,8 @@ function OrgChartNode({ data }: NodeProps<Node<ChartNodeData>>) {
         })}
       </div>
       <div className="flex items-center gap-2 border-t border-sd-border px-3.5 py-1.5 text-[10.5px] text-sd-muted">
+        {data.leaves.total - data.leaves.seeds > 0 && <span className="inline-flex items-center gap-0.5 font-medium text-emerald-700" title="Leaves caught on this node">🍃 {data.leaves.total - data.leaves.seeds}</span>}
+        {data.leaves.seeds > 0 && <span className="inline-flex items-center gap-0.5 font-medium text-amber-700" title="Seeds: leaves waiting for a place">🌱 {data.leaves.seeds}</span>}
         {stats.customerDocs > 0 && <span className="inline-flex items-center gap-1 text-amber-700"><ArrowDownLeft className="h-3 w-3" /> {stats.customerDocs} from customer</span>}
         {stats.inherited > 0 && <span>+{stats.inherited} inherited</span>}
         <span className={`ml-auto inline-flex items-center gap-0.5 ${data.expanded ? "text-sd-primary" : ""}`}>{categories.length} categories <ChevronRight className={`h-3 w-3 transition ${data.expanded ? "rotate-90" : ""}`} /></span>
@@ -59,7 +62,7 @@ function ProductNode({ data }: NodeProps<Node<ProductNodeData>>) {
       <Handle type="target" position={Position.Left} className="!h-1.5 !w-1.5 !border-0 !bg-[#c4c7ca]" />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[12.5px] font-semibold text-sd-text">{p.name}</div>
-        <div className="text-[10.5px] text-sd-muted">{data.count} item{data.count === 1 ? "" : "s"}{data.customerDocs ? ` · ${data.customerDocs} from customer` : ""}</div>
+        <div className="text-[10.5px] text-sd-muted">{data.count} item{data.count === 1 ? "" : "s"}{data.customerDocs ? ` · ${data.customerDocs} from customer` : ""}{data.leaves ? <span className="font-medium text-emerald-700"> · 🍃 {data.leaves}</span> : null}</div>
       </div>
       <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[4px] text-[12px] font-semibold" style={{ background: data.count ? `${p.color}1a` : "#f4f5f6", color: data.count ? p.color : "#a3a5a8" }}>{data.count}</span>
     </div>
@@ -91,19 +94,21 @@ function layout(nodes: Node[], edges: Edge[]) {
   return nodes.map((n) => { const p = g.node(n.id); const w = n.type === "product" ? PW : W; const h = n.type === "product" ? PH : H; return { ...n, position: { x: p.x - w / 2, y: p.y - h / 2 } }; });
 }
 
-export function OrgChart({ companyId, nodes: orgNodes, stats, categories, selectedId, selectedCat, customerDocsByCategory }: { companyId: string; nodes: OrgNode[]; stats: Record<string, NodeStats>; categories: Product[]; selectedId: string; selectedCat?: string; customerDocsByCategory: Record<string, Record<string, number>> }) {
+const NO_LEAVES: LeafCount = { total: 0, seeds: 0, byCategory: {} };
+
+export function OrgChart({ companyId, nodes: orgNodes, stats, categories, selectedId, selectedCat, customerDocsByCategory, leafCounts = {} }: { companyId: string; nodes: OrgNode[]; stats: Record<string, NodeStats>; categories: Product[]; selectedId: string; selectedCat?: string; customerDocsByCategory: Record<string, Record<string, number>>; leafCounts?: Record<string, LeafCount> }) {
   const router = useRouter();
   const { nodes, edges } = useMemo(() => {
-    const ns: Node[] = orgNodes.map((o) => ({ id: o.id, type: "org", width: W, height: H, position: { x: 0, y: 0 }, data: { org: o, stats: stats[o.id] ?? { items: 0, inherited: 0, byCategory: {}, customerDocs: 0 }, categories, selected: o.id === selectedId && !selectedCat, expanded: o.id === selectedId } satisfies ChartNodeData }));
+    const ns: Node[] = orgNodes.map((o) => ({ id: o.id, type: "org", width: W, height: H, position: { x: 0, y: 0 }, data: { org: o, stats: stats[o.id] ?? { items: 0, inherited: 0, byCategory: {}, customerDocs: 0 }, categories, selected: o.id === selectedId && !selectedCat, expanded: o.id === selectedId, leaves: leafCounts[o.id] ?? NO_LEAVES } satisfies ChartNodeData }));
     const es: Edge[] = orgNodes.filter((o) => o.parentId).map((o) => ({ id: `${o.parentId}-${o.id}`, source: o.parentId!, target: o.id, type: "smoothstep" }));
     // product nodes unfold under the selected entity: the fixed categories every entity carries
     for (const p of categories) {
       const id = `${selectedId}::${p.id}`;
-      ns.push({ id, type: "product", width: PW, height: PH, position: { x: 0, y: 0 }, data: { product: p, count: stats[selectedId]?.byCategory[p.id] ?? 0, customerDocs: customerDocsByCategory[selectedId]?.[p.id] ?? 0, selected: selectedCat === p.id } satisfies ProductNodeData });
+      ns.push({ id, type: "product", width: PW, height: PH, position: { x: 0, y: 0 }, data: { product: p, count: stats[selectedId]?.byCategory[p.id] ?? 0, customerDocs: customerDocsByCategory[selectedId]?.[p.id] ?? 0, selected: selectedCat === p.id, leaves: leafCounts[selectedId]?.byCategory[p.id] ?? 0 } satisfies ProductNodeData });
       es.push({ id: `${selectedId}-${id}`, source: selectedId, target: id, type: "smoothstep", style: { stroke: p.color, strokeWidth: 1.5 } });
     }
     return { nodes: layout(ns, es), edges: es };
-  }, [orgNodes, stats, selectedId, selectedCat, categories, customerDocsByCategory]);
+  }, [orgNodes, stats, selectedId, selectedCat, categories, customerDocsByCategory, leafCounts]);
 
   const selectedOrg = orgNodes.find((o) => o.id === selectedId);
   const focusIds = useMemo(() => [selectedId, ...categories.map((p) => `${selectedId}::${p.id}`)], [selectedId, categories]);

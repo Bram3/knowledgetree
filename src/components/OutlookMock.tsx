@@ -3,24 +3,12 @@
 import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 import { Mail, Inbox, Send, FileText, Archive, Trash2, Search, Reply, Forward, MoreHorizontal, Paperclip, ChevronRight, Check, ExternalLink, StickyNote, Star } from "lucide-react";
-import { suggestNode, nodeSummary, addFile, addNote } from "@/lib/actions";
+import { suggestNode, nodeSummary, addFile } from "@/lib/actions";
+import { ingestText, type IngestedLeaf } from "@/lib/leaf-actions";
+import { DEMO_MAILS, mailIngestInput, type DemoMail } from "@/lib/demo-mails";
+import { LeafTypeBadge } from "./LeafList";
 
-const mails = [
-  { id: "e1", from: "Katrin Vogel", email: "katrin.vogel@nike.com", subject: "Updated payroll calendar Q4 2026 – Nike Deutschland GmbH", time: "08:41", preview: "Hi Lena, as discussed with Sofie, please find attached the new payroll calendar…", body: `Hi Lena,
-
-As discussed with Sofie, please find attached the new payroll calendar for Nike Deutschland GmbH for Q4 2026.
-
-Important: from the October run the cutoff for variable input moves from the 15th to the 18th of the month, because of our new time registration system. Pay date remains the 25th.
-
-Could you confirm that SDWorx has this on file? We had some confusion last year with different versions floating around.
-
-Mit freundlichen Grüßen,
-Katrin Vogel
-Head of Payroll Germany, Nike Deutschland GmbH`, attachment: { name: "Nike_DE_Payroll_Calendar_Q4_2026.xlsx", size: "128 KB" }, unread: true },
-  { id: "e2", from: "Marta Kowalski", email: "marta.kowalski@sdworx.com", subject: "RE: Nike MSA 2026 price schedule", time: "Yesterday", preview: "Uploaded v3 to the tree, Tom verified the appendix.", body: "Uploaded v3 to the tree, Tom verified the appendix.\n\nMarta", unread: false },
-  { id: "e3", from: "Anouk de Vries", email: "anouk.devries@nike.com", subject: "Nike Hilversum: question about 30% ruling end dates", time: "Mon", preview: "Hi, two of our expats' rulings end in December…", body: "Hi,\n\nTwo of our expats' rulings end in December. Can you check what we need to do?\n\nAnouk", unread: false },
-  { id: "e4", from: "Joris Bakker", email: "j.bakker@valk.nl", subject: "Van der Valk Hotel Amsterdam: new roster export", time: "Mon", preview: "Hi Pieter, from next month the roster export…", body: "Hi Pieter,\n\nFrom next month the roster export from Hotel Amsterdam comes from the new planning tool. Specification attached next week.\n\nJoris", unread: false },
-];
+const mails = DEMO_MAILS;
 
 export function OutlookMock() {
   const [sel, setSel] = useState(mails[0]);
@@ -33,7 +21,7 @@ export function OutlookMock() {
       </div>
       <div className="flex w-[170px] flex-col border-r border-[#e1dfdd] bg-[#faf9f8] pt-3">
         <div className="px-4 pb-2 text-[12px] font-semibold text-[#605e5c]">lena.vermeulen@sdworx.com</div>
-        {[["Inbox", Inbox, 4], ["Sent", Send, 0], ["Drafts", FileText, 1], ["Archive", Archive, 0], ["Deleted", Trash2, 0]].map(([l, I, n], i) => { const Icon = I as typeof Inbox; return (
+        {[["Inbox", Inbox, mails.length], ["Sent", Send, 0], ["Drafts", FileText, 1], ["Archive", Archive, 0], ["Deleted", Trash2, 0]].map(([l, I, n], i) => { const Icon = I as typeof Inbox; return (
           <div key={l as string} className={`mx-2 flex items-center gap-2 rounded px-2 py-1.5 text-[13px] ${i === 0 ? "bg-[#edebe9] font-semibold" : ""}`}><Icon className="h-4 w-4 text-[#605e5c]" />{l as string}{(n as number) > 0 && <span className="ml-auto text-[11px] text-[#0f6cbd]">{n as number}</span>}</div>); })}
       </div>
       <div className="flex w-[290px] flex-col border-r border-[#e1dfdd] bg-white">
@@ -69,14 +57,17 @@ export function OutlookMock() {
   );
 }
 
-function AddInPane({ sel }: { sel: (typeof mails)[number] }) {
+function AddInPane({ sel }: { sel: DemoMail }) {
   const [suggest, setSuggest] = useState<Awaited<ReturnType<typeof suggestNode>>>(null);
-  const [summary, setSummary] = useState<Awaited<ReturnType<typeof nodeSummary>>>(null);
-  const [saved, setSaved] = useState<{ what: string; href: string }[]>([]);
+  const [summary, setSummary] = useState<Awaited<ReturnType<typeof nodeSummary>> | null>(null);
+  const [caught, setCaught] = useState<{ leaves: IngestedLeaf[]; companyId: string | null } | "error" | null>(null);
+  const [filed, setFiled] = useState(false);
   const [pending, start] = useTransition();
 
   useEffect(() => {
     suggestNode(`${sel.from} ${sel.email} ${sel.subject} ${sel.body}`).then(async (s) => { setSuggest(s); if (s) setSummary(await nodeSummary(s.nodeId)); });
+    // 0 clicks: every opened mail goes through ingest. Re-opening it returns the same leaves.
+    ingestText(mailIngestInput(sel)).then(setCaught, () => setCaught("error"));
   }, [sel]);
 
   return (
@@ -105,33 +96,41 @@ function AddInPane({ sel }: { sel: (typeof mails)[number] }) {
             </div>
           )}
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Capture</div>
-            <div className="mt-1.5 space-y-1.5">
-              {sel.attachment && (
-                <button disabled={!suggest || pending || saved.some((s) => s.what === "file")} onClick={() => start(async () => {
-                  if (!suggest) return;
-                  await addFile({ nodeId: suggest.nodeId, title: sel.attachment!.name.replace(/_/g, " ").replace(/\.xlsx$/, ""), fileName: sel.attachment!.name, fileSize: sel.attachment!.size, fileUrl: `/files/${sel.attachment!.name}`, previewUrl: "/files/att-nike-de-calendar.pdf", content: `Attachment from email "${sel.subject}" sent by ${sel.from}. ${sel.body.split("\n").find((l) => /important/i.test(l)) ?? ""}`.trim(), topic: suggest.topic === "General" ? "Payroll calendar" : suggest.topic, category: suggest.category, origin: "customer", scope: suggest.country ? [suggest.country] : ["all"], source: { type: "outlook", ref: `Email from ${sel.email}` } });
-                  setSaved((s) => [...s, { what: "file", href: `/customers/${suggest.companyId}?node=${suggest.nodeId}` }]);
-                })} className="flex w-full items-center gap-2 rounded-lg bg-[#0f6cbd] px-3 py-2 text-left text-[12.5px] font-medium text-white hover:bg-[#115ea3] disabled:opacity-50">
-                  {saved.some((s) => s.what === "file") ? <Check className="h-4 w-4" /> : <Paperclip className="h-4 w-4" />} {saved.some((s) => s.what === "file") ? "Attachment filed to node" : "File attachment to this node"}
-                </button>
-              )}
-              <button disabled={!suggest || pending || saved.some((s) => s.what === "note")} onClick={() => start(async () => {
-                if (!suggest) return;
-                await addNote({ nodeId: suggest.nodeId, title: sel.subject.replace(/^(RE|FW):\s*/i, ""), content: sel.body.split("\n").filter((l) => l.trim() && !/^(hi|dear|mit|regards|klaus|head of|els|anouk|marta)/i.test(l.trim())).join(" ").slice(0, 400), topic: suggest.topic, category: suggest.category, origin: "customer", scope: suggest.country ? [suggest.country] : ["all"], source: { type: "outlook", ref: `Email from ${sel.email}, ${sel.time}` } });
-                setSaved((s) => [...s, { what: "note", href: `/customers/${suggest.companyId}?node=${suggest.nodeId}` }]);
-              })} className="flex w-full items-center gap-2 rounded-lg border border-[#e1dfdd] bg-white px-3 py-2 text-left text-[12.5px] font-medium hover:bg-[#f3f2f1] disabled:opacity-50">
-                {saved.some((s) => s.what === "note") ? <Check className="h-4 w-4 text-emerald-600" /> : <StickyNote className="h-4 w-4 text-amber-500" />} {saved.some((s) => s.what === "note") ? "Email saved as note" : "Save email as a note"}
-              </button>
-            </div>
-            {saved.length > 0 && (
-              <div className="fade-up mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-[12px] text-emerald-800">
-                <div className="flex items-center gap-1.5 font-semibold"><Check className="h-4 w-4" /> Captured with full audit trail</div>
-                <div className="mt-0.5 text-emerald-700">Saved by Lena Vermeulen, just now, source email kept.</div>
-                <Link href={saved[0].href} className="mt-2 inline-flex items-center gap-1 font-medium text-emerald-800 underline">Open node in KnowledgeTree <ExternalLink className="h-3 w-3" /></Link>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Read automatically</div>
+            {caught === null ? (
+              <div className="mt-1.5 text-[12.5px] text-slate-400">Looking for leaves…</div>
+            ) : caught === "error" ? (
+              <div className="mt-1.5 text-[12.5px] text-slate-400">Could not read this email right now.</div>
+            ) : caught.leaves.length === 0 ? (
+              <div className="fade-up mt-1.5 rounded-lg border border-dashed border-sd-border bg-white px-3 py-2.5 text-[12px] text-slate-500">Nothing worth keeping in this email. No leaves.</div>
+            ) : (
+              <div className="fade-up mt-1.5 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-[12px] text-emerald-900">
+                <div className="flex items-center gap-1.5 font-semibold">🍃 {caught.leaves.length} lea{caught.leaves.length === 1 ? "f" : "ves"} caught</div>
+                <ul className="mt-2 space-y-2">
+                  {caught.leaves.map((l) => (
+                    <li key={l.id} className="rounded-md bg-white p-2 ring-1 ring-emerald-100">
+                      <div className="flex items-center gap-1.5"><LeafTypeBadge type={l.type} />{l.status === "seed" && <span className="text-[10.5px] font-medium text-amber-700">🌱 seed: place unsure</span>}</div>
+                      <div className="mt-1 text-[12px] leading-snug text-sd-text">{l.statement}</div>
+                      <div className="mt-1 text-[11px] text-slate-500">{l.path.join(" › ")} · {Math.round(l.confidence * 100)}%</div>
+                    </li>
+                  ))}
+                </ul>
+                {caught.companyId && <Link href={`/customers/${caught.companyId}?node=${caught.leaves[0].nodeId}`} className="mt-2 inline-flex items-center gap-1 font-medium text-emerald-800 underline">Open in KnowledgeTree <ExternalLink className="h-3 w-3" /></Link>}
               </div>
             )}
           </div>
+          {sel.attachment && (
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Attachment</div>
+              <button disabled={!suggest || pending || filed} onClick={() => start(async () => {
+                if (!suggest) return;
+                await addFile({ nodeId: suggest.nodeId, title: sel.attachment!.name.replace(/_/g, " ").replace(/\.xlsx$/, ""), fileName: sel.attachment!.name, fileSize: sel.attachment!.size, fileUrl: `/files/${sel.attachment!.name}`, previewUrl: "/files/att-nike-de-calendar.pdf", content: `Attachment from email "${sel.subject}" sent by ${sel.from}. ${sel.body.split("\n").find((l) => /important/i.test(l)) ?? ""}`.trim(), topic: suggest.topic === "General" ? "Payroll calendar" : suggest.topic, category: suggest.category, origin: "customer", scope: suggest.country ? [suggest.country] : ["all"], source: { type: "outlook", ref: `Email from ${sel.email}` } });
+                setFiled(true);
+              })} className="mt-1.5 flex w-full items-center gap-2 rounded-lg bg-[#0f6cbd] px-3 py-2 text-left text-[12.5px] font-medium text-white hover:bg-[#115ea3] disabled:opacity-50">
+                {filed ? <Check className="h-4 w-4" /> : <Paperclip className="h-4 w-4" />} {filed ? "Attachment filed to node" : "File attachment to this node"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </>

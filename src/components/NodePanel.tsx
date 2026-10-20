@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ChevronRight, UserPlus, Upload, Plus, StickyNote, Paperclip, History, Users, BookOpen, ArrowDownToLine, Phone, MessageSquare, Pencil, Archive, Building2, ArrowDownLeft, Download } from "lucide-react";
-import type { Item, OrgNode, Person } from "@/lib/types";
+import { ChevronRight, UserPlus, Upload, Plus, StickyNote, Paperclip, History, Users, BookOpen, ArrowDownToLine, Phone, MessageSquare, Pencil, Archive, Building2, ArrowDownLeft, Download, Leaf as LeafIcon } from "lucide-react";
+import type { Item, Leaf, OrgNode, Person } from "@/lib/types";
+import { LeafCard } from "./LeafList";
 import type { Product } from "@/lib/catalog";
 import { OTHER_CATEGORY } from "@/lib/catalog";
 import { Avatar, personName } from "./Avatar";
@@ -14,6 +15,7 @@ import { ViewDocumentButton } from "./DocumentViewer";
 import { NoteEditor } from "./NoteEditor";
 import { fmtDate, timeAgo, COUNTRY_NAME } from "@/lib/format";
 import { claimItem, addNote, uploadFile, uploadVersion, updateNote, archiveItem } from "@/lib/actions";
+import { UPLOAD_ACCEPT } from "@/lib/upload-rules";
 
 export type PanelItem = Item & { inheritedFrom?: string };
 export type PanelData = {
@@ -28,6 +30,7 @@ export type PanelData = {
   highlightItem?: string;
   currentUserId: string;
   initialCategory?: string;
+  leaves: Leaf[]; // live leaves on this node (seeds included at the customer root)
 };
 
 export function NodePanel({ data }: { data: PanelData }) {
@@ -42,6 +45,7 @@ export function NodePanel({ data }: { data: PanelData }) {
   const ours = visible.filter((i) => i.origin === "sdworx");
   const theirs = visible.filter((i) => i.origin === "customer");
   const visibleInherited = cat === "all" ? data.inherited : data.inherited.filter((i) => i.category === cat);
+  const visibleLeaves = cat === "all" ? data.leaves : data.leaves.filter((l) => l.category === cat || l.status === "seed");
   const defaultCategory = cat === "all" ? data.categories[0]?.id : cat;
 
   return (
@@ -53,7 +57,7 @@ export function NodePanel({ data }: { data: PanelData }) {
           <span className="rounded-[4px] bg-sd-subtle px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-sd-muted">{data.node.type}{data.viewCountry ? ` · ${COUNTRY_NAME[data.viewCountry] ?? data.viewCountry}` : ""}</span>
         </div>
         <div className="mt-3 flex gap-1">
-          {([["knowledge", "Knowledge", BookOpen, active.length + data.inherited.length], ["people", "People", Users, data.experts.length + (data.node.contacts?.length ?? 0)], ["history", "History", History, data.activity.length]] as const).map(([k, label, Icon, n]) => (
+          {([["knowledge", "Knowledge", BookOpen, active.length + data.inherited.length + data.leaves.length], ["people", "People", Users, data.experts.length + (data.node.contacts?.length ?? 0)], ["history", "History", History, data.activity.length]] as const).map(([k, label, Icon, n]) => (
             <button key={k} onClick={() => setTab(k)} className={`inline-flex items-center gap-1.5 rounded-[4px] px-2.5 py-1.5 text-[12.5px] font-medium ${tab === k ? "bg-sd-dark text-white" : "text-sd-muted hover:bg-sd-subtle"}`}><Icon className="h-3.5 w-3.5" /> {label} <span className={`rounded-[4px] px-1 text-[10.5px] ${tab === k ? "bg-white/15" : "bg-sd-subtle"}`}>{n}</span></button>
           ))}
         </div>
@@ -89,6 +93,11 @@ export function NodePanel({ data }: { data: PanelData }) {
             )}
             {adding === "file" && <UploadForm nodeId={data.node.id} country={data.viewCountry} categories={data.categories} defaultCategory={defaultCategory} onDone={() => setAdding(null)} />}
 
+            {visibleLeaves.length > 0 && (
+              <Section icon={LeafIcon} title="Leaves" hint="Caught from mails, calls and chats, with the quote as proof" count={visibleLeaves.length} tone="leaf">
+                {visibleLeaves.map((l) => <LeafCard key={l.id} leaf={l} />)}
+              </Section>
+            )}
             <Section icon={Building2} title="SDWorx documents" hint="Created and maintained by SDWorx" count={ours.length}>
               {ours.map((i) => <ItemCard key={i.id} item={i} highlight={data.highlightItem === i.id} me={data.currentUserId} categories={data.categories} />)}
             </Section>
@@ -153,11 +162,11 @@ export function NodePanel({ data }: { data: PanelData }) {
   );
 }
 
-function Section({ icon: Icon, title, hint, count, tone, children }: { icon: typeof Building2; title: string; hint: string; count: number; tone?: "customer"; children: React.ReactNode }) {
+function Section({ icon: Icon, title, hint, count, tone, children }: { icon: typeof Building2; title: string; hint: string; count: number; tone?: "customer" | "leaf"; children: React.ReactNode }) {
   return (
     <section>
       <div className="mb-2 flex items-center gap-2">
-        <span className={`grid h-6 w-6 place-items-center rounded-[4px] ${tone === "customer" ? "bg-sd-gold/15 text-amber-700" : "bg-sd-dark/10 text-sd-dark"}`}><Icon className="h-3.5 w-3.5" /></span>
+        <span className={`grid h-6 w-6 place-items-center rounded-[4px] ${tone === "customer" ? "bg-sd-gold/15 text-amber-700" : tone === "leaf" ? "bg-emerald-100 text-emerald-700" : "bg-sd-dark/10 text-sd-dark"}`}><Icon className="h-3.5 w-3.5" /></span>
         <span className="text-[12.5px] font-semibold">{title}</span>
         <span className="text-[11.5px] text-sd-muted">· {count}</span>
         <span className="ml-auto text-[11px] text-slate-400">{hint}</span>
@@ -171,6 +180,7 @@ function ItemCard({ item, highlight, me, categories }: { item: PanelItem; highli
   const [open, setOpen] = useState(highlight);
   const [editing, setEditing] = useState(false);
   const [newVersion, setNewVersion] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const last = item.versions.at(-1)!;
   const doc = { title: item.title, fileName: item.fileName, fileSize: item.fileSize, fileUrl: item.fileUrl, previewUrl: item.previewUrl, meta: `v${item.versions.length} · ${personName(item.ownerId)}` };
@@ -227,11 +237,12 @@ function ItemCard({ item, highlight, me, categories }: { item: PanelItem; highli
             </div>
           )}
           {newVersion && (
-            <form className="mt-2 flex flex-wrap items-center gap-1.5 rounded-[4px] bg-sd-subtle p-2" action={(fd) => start(async () => { await uploadVersion(fd); setNewVersion(false); })}>
+            <form className="mt-2 flex flex-wrap items-center gap-1.5 rounded-[4px] bg-sd-subtle p-2" action={(fd) => start(async () => { try { setUploadError(null); await uploadVersion(fd); setNewVersion(false); } catch { setUploadError(UPLOAD_ERROR); } })}>
               <input type="hidden" name="itemId" value={item.id} />
-              <input type="file" name="file" className="text-[11.5px]" />
+              <input type="file" name="file" accept={UPLOAD_ACCEPT} className="text-[11.5px]" />
               <input name="note" placeholder="What changed?" className="input min-w-0 flex-1 px-2 py-1 text-[12px]" />
               <button disabled={pending} className="btn-primary px-2.5 py-1.5 text-[12px] disabled:opacity-50">{pending ? "Uploading…" : "Save version"}</button>
+              {uploadError && <div className="w-full text-[11.5px] text-sd-red">{uploadError}</div>}
             </form>
           )}
         </div>
@@ -241,17 +252,21 @@ function ItemCard({ item, highlight, me, categories }: { item: PanelItem; highli
   );
 }
 
+const UPLOAD_ERROR = "Upload refused: use PDF, Word, Excel, PowerPoint, an image or text, up to 10 MB.";
+
 function UploadForm({ nodeId, country, categories, defaultCategory, onDone }: { nodeId: string; country?: string; categories: Product[]; defaultCategory?: string; onDone: () => void }) {
   const [pending, start] = useTransition();
   const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
   return (
-    <form className="fade-up space-y-2 rounded-[8px] border border-sd-primary bg-sd-subtle p-3" action={(fd) => start(async () => { await uploadFile(fd); onDone(); })}>
+    <form className="fade-up space-y-2 rounded-[8px] border border-sd-primary bg-sd-subtle p-3" action={(fd) => start(async () => { try { setError(null); await uploadFile(fd); onDone(); } catch { setError(UPLOAD_ERROR); } })}>
       <input type="hidden" name="nodeId" value={nodeId} />
       <div className="flex items-center gap-2 text-[12.5px] font-semibold"><Upload className="h-4 w-4" /> Upload a document</div>
       <label className="flex cursor-pointer items-center gap-3 rounded-[4px] border border-dashed border-sd-border bg-white px-3 py-3 text-[12.5px] text-sd-muted hover:border-sd-primary">
         <Paperclip className="h-4 w-4" /> {name || "Choose a file (PDF, Word, Excel, image…)"}
-        <input type="file" name="file" required className="hidden" onChange={(e) => setName(e.target.files?.[0]?.name ?? "")} />
+        <input type="file" name="file" required accept={UPLOAD_ACCEPT} className="hidden" onChange={(e) => setName(e.target.files?.[0]?.name ?? "")} />
       </label>
+      {error && <div className="text-[12px] text-sd-red">{error}</div>}
       <input name="title" placeholder="Title (defaults to the file name)" className="input w-full px-2.5 py-1.5 text-[13px]" />
       <textarea name="content" rows={2} placeholder="Short description of what is in the file" className="input w-full px-2.5 py-1.5 text-[13px]" />
       <div className="grid grid-cols-2 gap-2">

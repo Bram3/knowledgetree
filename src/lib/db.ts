@@ -4,7 +4,12 @@ import { seed } from "./seed";
 import type { Db, Item, OrgNode, Activity } from "./types";
 import { PRODUCTS, OTHER_CATEGORY, type Product } from "./catalog";
 
-const FILE = path.join(process.cwd(), "data", "db.json");
+/** Runtime state directory (db.json, uploads/). Override with KT_DATA_DIR (tests use a temp dir). */
+export function dataDir() {
+  return process.env.KT_DATA_DIR || path.join(process.cwd(), "data");
+}
+
+const FILE = path.join(dataDir(), "db.json");
 
 declare global {
   var __ktdb: Db | undefined;
@@ -14,8 +19,10 @@ function load(): Db {
   if (globalThis.__ktdb) return globalThis.__ktdb;
   try {
     if (fs.existsSync(FILE)) {
-      globalThis.__ktdb = JSON.parse(fs.readFileSync(FILE, "utf8")) as Db;
-      return globalThis.__ktdb;
+      const db = JSON.parse(fs.readFileSync(FILE, "utf8")) as Db;
+      db.leaves ??= []; // db.json written before leaves existed
+      globalThis.__ktdb = db;
+      return db;
     }
   } catch {}
   globalThis.__ktdb = structuredClone(seed);
