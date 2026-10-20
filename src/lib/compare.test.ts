@@ -6,6 +6,7 @@ import { getDb, resetDb, person } from "./db";
 import type { ModelClient, ModelRequest } from "./gemini";
 import { DEMO_MAILS, mailIngestInput } from "./demo-mails";
 import { DEMO_TEAMS_MESSAGES, teamsReactionInput } from "./demo-teams";
+import { ingestDemoCall } from "./demo-call";
 
 /**
  * COMPARE at ingest: a new leaf is matched against the notes and live leaves on its node › category.
@@ -97,6 +98,17 @@ describe("the demo flows work from the committed cache (Vertex down)", () => {
     const change = first.leaves.find((l) => l.type === "change")!;
     const res = await ingest(lena(), mailById("e1"), { model: down });
     expect(res.reconfirmed).toMatchObject([{ id: change.id }]);
+  });
+
+  it("scene 3: the call's 20th conflicts with Jonas's note, and Katrin's confirmation mail makes it ×2", async () => {
+    const call = await ingestDemoCall(lena(), { model: down });
+    const change = call.leaves.find((l) => l.type === "change")!;
+    expect(change).toMatchObject({ status: "conflict", conflictsWith: "i-nk-de-cutoff-new", conflictClaims: { said: "the 20th", noted: "the 18th" } });
+    expect(call.leaves.filter((l) => l.status === "conflict")).toHaveLength(1);
+
+    const mail = await ingest(lena(), mailById("e7"), { model: down });
+    expect(mail.leaves).toEqual([]);
+    expect(mail.reconfirmed).toMatchObject([{ id: change.id, reconfirmedAt: [expect.any(String)] }]);
   });
 
   it("Katrin's confirmation of the 20th conflicts with Jonas's note when nothing else was caught yet", async () => {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, Network, History, MessageSquare, Mail, LogOut, RotateCcw } from "lucide-react";
+import { Search, Network, History, MessageSquare, Mail, Phone, LogOut, RotateCcw } from "lucide-react";
 import { useTransition } from "react";
 import { Avatar } from "./Avatar";
 import { TimeSlider } from "./TimeSlider";
@@ -14,6 +14,7 @@ const nav = [
   { href: "/activity", label: "Changes", icon: History },
 ];
 const integrations = [
+  { href: "/call", label: "Teams call", icon: Phone },
   { href: "/teams", label: "Teams", icon: MessageSquare },
   { href: "/outlook", label: "Outlook", icon: Mail },
 ];
@@ -41,7 +42,7 @@ export function Shell({ children, user, simMonths = 0 }: { children: React.React
   const path = usePathname();
   const [pending, start] = useTransition();
   if (!user || path.startsWith("/login")) return <main className="min-h-screen">{children}</main>;
-  const fullBleed = path.startsWith("/teams") || path.startsWith("/outlook");
+  const fullBleed = path.startsWith("/teams") || path.startsWith("/outlook") || path.startsWith("/call");
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
   const item = (n: { href: string; label: string; icon: typeof Search }, tag?: string) => (
     <Link key={n.href} href={n.href} className={`flex items-center gap-2.5 rounded-[4px] px-3 py-2 text-[13.5px] font-medium transition ${active(n.href) ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"}`}>

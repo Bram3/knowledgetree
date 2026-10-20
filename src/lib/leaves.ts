@@ -32,6 +32,15 @@ export function addLeaves(leaves: Leaf[]) {
   saveDb((db) => void db.leaves.push(...leaves));
 }
 
+/** Delete leaves outright (undo right after capture). Unknown ids are ignored. */
+export function removeLeaves(ids: string[]) {
+  const drop = new Set(ids);
+  if (!drop.size) return;
+  saveDb((db) => {
+    db.leaves = db.leaves.filter((l) => !drop.has(l.id));
+  });
+}
+
 /** Change one leaf in place (status, reconfirmedAt, usefulCount, ...). Returns the updated leaf, or null if unknown. */
 export function updateLeaf(id: string, mutate: (leaf: Leaf) => void): Leaf | null {
   let out: Leaf | null = null;
