@@ -1,5 +1,5 @@
 """Generate realistic demo documents for every seeded file item.
-Outputs public/files/<fileName> (original format: pdf/xlsx/docx) and public/files/<id>.pdf (preview)."""
+Outputs assets/files/<fileName> (original format: pdf/xlsx/docx) and assets/files/<id>.pdf (preview)."""
 import os, subprocess, shutil, html
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -9,7 +9,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
-OUT = os.path.join(os.path.dirname(__file__), "..", "public", "files")
+OUT = os.path.join(os.path.dirname(__file__), "..", "assets", "files")
 os.makedirs(OUT, exist_ok=True)
 styles = getSampleStyleSheet()
 H1 = ParagraphStyle("h1", parent=styles["Title"], fontSize=20, leading=24, alignment=0, spaceAfter=6)
