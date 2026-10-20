@@ -3,3 +3,7 @@ allowBuilds:
   protobufjs: false
   sharp: false
   unrs-resolver: false
+
+# GHSA-68fv-2mgg-jv7q: pulled in via next and @tailwindcss/postcss (postcss). Drop when they ship >=1.2.2 themselves.
+overrides:
+  source-map-js: ^1.2.2
