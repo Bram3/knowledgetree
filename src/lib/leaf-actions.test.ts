@@ -23,16 +23,18 @@ describe("ingestText (server action)", () => {
 
   it("Lena opening the Nike Germany mail grows leaves, with the node path for display", async () => {
     await signInAs("lena");
+    const before = leavesForCompany("nike").length;
     const res = await ingestText(e1);
     expect(res.leaves.length).toBeGreaterThan(0);
     expect(res.leaves[0].path).toEqual(["Nike EMEA", "Germany", "Nike Deutschland GmbH"]);
-    expect(leavesForCompany("nike").length).toBe(res.leaves.length);
+    expect(leavesForCompany("nike").length).toBe(before + res.leaves.length);
   });
 
   it("Amélie (no Nike access) gets nothing and nothing is stored", async () => {
     await signInAs("amelie");
+    const before = leavesForCompany("nike");
     expect((await ingestText(e1)).leaves).toEqual([]);
-    expect(leavesForCompany("nike")).toEqual([]);
+    expect(leavesForCompany("nike")).toEqual(before);
   });
 
   it("rejects malformed input sent straight to the action", async () => {

@@ -21,6 +21,7 @@ function load(): Db {
     if (fs.existsSync(FILE)) {
       const db = JSON.parse(fs.readFileSync(FILE, "utf8")) as Db;
       db.leaves ??= []; // db.json written before leaves existed
+      db.handovers ??= [];
       globalThis.__ktdb = db;
       return db;
     }

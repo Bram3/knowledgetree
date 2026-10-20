@@ -6,6 +6,7 @@ export type Person = {
   color: string; // tailwind bg class
   email: string;
   customerIds: string[]; // customers this person may access
+  leftAt?: string; // left the team or changed role: their knowledge needs a new owner (handover)
 };
 
 export type Company = {
@@ -77,7 +78,8 @@ export type ActivityAction =
   | "new_version"
   | "node_added"
   | "captured_teams"
-  | "captured_outlook";
+  | "captured_outlook"
+  | "handed_over";
 
 export type Activity = {
   id: string;
@@ -130,6 +132,19 @@ export type Leaf = {
   conflictsWith?: string;
   promotedToItemId?: string;
   verifiedById?: string;
+  ownerId?: string; // set by a handover; without it the owner is source.byId
+};
+
+/** Ownership of a leaver's leaves and items on one customer moved to a successor. */
+export type Handover = {
+  id: string;
+  companyId: string;
+  fromId: string;
+  toId: string;
+  byId: string;
+  at: string;
+  leafIds: string[];
+  itemIds: string[];
 };
 
 export type Db = {
@@ -139,4 +154,5 @@ export type Db = {
   items: Item[];
   activity: Activity[];
   leaves: Leaf[];
+  handovers: Handover[];
 };

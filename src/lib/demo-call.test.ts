@@ -6,6 +6,7 @@ import { person, resetDb } from "./db";
 import { ingestDemoCall } from "./demo-call";
 import { ingestAudio } from "./audio-ingest";
 import { leavesForCompany } from "./leaves";
+import { seed } from "./seed";
 import { endDemoCall, ingestText, undoLeaves } from "./leaf-actions";
 import { AccessDeniedError } from "./access";
 import { DEMO_MAILS, mailIngestInput } from "./demo-mails";
@@ -17,6 +18,9 @@ const down: ModelClient = { generate: async () => { throw new Error("429 RESOURC
 
 const transcript = fs.readFileSync(path.join(process.cwd(), "public/demo/nike-call-transcript.txt"), "utf8");
 const lena = () => person("lena")!;
+/** Nike leaves caught in this test (the seed has leaves of its own). */
+const caught = () => leavesForCompany("nike").filter((l) => !seeded.has(l.id));
+const seeded = new Set(seed.leaves.map((l) => l.id));
 
 beforeEach(async () => {
   resetDb();
@@ -45,8 +49,8 @@ describe("ending the demo call with Katrin (scene 1)", () => {
 
   it("stores no raw audio or full transcript, only the leaves with their quotes and a reference to the call", async () => {
     const { leaves } = await ingestDemoCall(lena(), { model: down });
-    const stored = JSON.stringify(leavesForCompany("nike"));
-    expect(leavesForCompany("nike")).toHaveLength(leaves.length);
+    const stored = JSON.stringify(caught());
+    expect(caught()).toHaveLength(leaves.length);
     expect(stored).not.toContain("Good weekend");
     expect(stored).not.toContain("SUQz"); // base64 of an MP3 ID3 header
     expect(leaves[0].source.ref).toMatch(/^call:/);
@@ -70,7 +74,7 @@ describe("hanging up and undo (server actions)", () => {
     const mail = await ingestText(mailIngestInput(DEMO_MAILS.find((m) => m.id === "e1")!));
     const call = await endDemoCall();
     await undoLeaves(call.leaves.map((l) => l.id));
-    expect(leavesForCompany("nike").map((l) => l.id).sort()).toEqual(mail.leaves.map((l) => l.id).sort());
+    expect(caught().map((l) => l.id).sort()).toEqual(mail.leaves.map((l) => l.id).sort());
   });
 
   it("someone else can't undo Lena's leaves, not even with access to Nike", async () => {
@@ -80,7 +84,7 @@ describe("hanging up and undo (server actions)", () => {
       await signInAs(who);
       await expect(undoLeaves(ids)).rejects.toBeInstanceOf(AccessDeniedError);
     }
-    expect(leavesForCompany("nike")).toHaveLength(3);
+    expect(caught()).toHaveLength(3);
   });
 
   it("rejects ids that are not a list of strings", async () => {
