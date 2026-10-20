@@ -32,7 +32,10 @@ export function TeamsMock({ reactions }: { reactions: Record<string, Ingested> }
     // A leaf links back here as /teams#<message id>: show that message instead of the end of the chat.
     const id = decodeURIComponent(window.location.hash.slice(1));
     const el = id ? document.getElementById(id) : null;
-    if (!el) return endRef.current?.scrollIntoView();
+    if (!el) {
+      endRef.current?.scrollIntoView();
+      return;
+    }
     el.scrollIntoView({ block: "center" });
     setLinked(id); // eslint-disable-line react-hooks/set-state-in-effect -- reads the URL hash once after mount
   }, []);
