@@ -4,7 +4,7 @@
 
 A proof of concept for the SDWorx hackathon challenge *Unlock the Knowledge Within: Find it. Understand it. Trust it.*
 
-**Live demo:** https://knowledgetree-99869633039.europe-west1.run.app (pick any account on the login page, for example Lena Vermeulen)
+**Live demo:** https://knowledgetree-862453759732.us-east1.run.app (pick any account on the login page, for example Lena Vermeulen)
 
 ![Search](docs/screenshots/03-search-result.png)
 
@@ -160,10 +160,11 @@ gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregi
 
 gcloud run deploy knowledgetree \
   --source . \
-  --region europe-west1 \
+  --region us-east1 \
   --allow-unauthenticated \
   --memory 1Gi \
-  --min-instances 1
+  --min-instances 1 \
+  --max-instances 1
 ```
 
 Re-run the same command to redeploy. `--min-instances 1` keeps one instance warm for the pitch. Data and uploads live inside the container, so they reset when Cloud Run replaces the instance; press **Reset demo data** before the demo. Local container check: `pnpm docker:build` then `pnpm docker:run` (http://localhost:8080).
