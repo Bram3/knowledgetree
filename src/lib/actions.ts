@@ -8,7 +8,7 @@ import { requireCustomerAccess, requireItemAccess, requireCompanyAccess, AccessD
 import type { Item, ActivityAction, Person } from "./types";
 import { storeUpload } from "./uploads";
 import { assertLinkableFile } from "./files";
-import { idString, ValidationError } from "./validation";
+import { idList, idString, MAX_CONTENT, MAX_QUESTION, MAX_TEXT, oneOf, optionalText, record, textString, ValidationError } from "./validation";
 import { revalidateAll } from "./revalidate";
 
 async function actor() {
@@ -38,7 +38,48 @@ export async function logout() {
 
 // ---------- knowledge ----------
 
-export async function addNote(input: { nodeId: string; title: string; content: string; topic: string; category?: string; origin?: Item["origin"]; scope: string[]; source?: Item["source"] }) {
+// Server actions are public POST endpoints: every argument is checked (type, length, allowed values) before use.
+const ORIGINS = ["sdworx", "customer"] as const;
+const SOURCE_TYPES = ["portal", "teams", "outlook"] as const;
+const NODE_TYPES = ["country", "entity", "division", "team"] as const;
+const MAX_SCOPE = 50;
+
+type NoteInput = { nodeId: string; title: string; content: string; topic: string; category?: string; origin?: Item["origin"]; scope: string[]; source?: Item["source"] };
+
+/** Checks the fields notes and files share. Throws ValidationError. */
+function parseNoteInput(raw: unknown): NoteInput {
+  const i = record(raw, "input");
+  const scope = idList(i.scope, MAX_SCOPE, "scope");
+  let source: Item["source"] | undefined;
+  if (i.source !== undefined) {
+    const s = record(i.source, "source");
+    source = { type: oneOf(s.type, SOURCE_TYPES, "source type"), ref: textString(s.ref, MAX_TEXT, "source ref") };
+  }
+  return {
+    nodeId: idString(i.nodeId, "node id"),
+    title: textString(i.title, MAX_TEXT, "title"),
+    content: textString(i.content, MAX_CONTENT, "content"),
+    topic: textString(i.topic ?? "", MAX_TEXT, "topic"),
+    category: optionalText(i.category, MAX_TEXT, "category"),
+    origin: i.origin === undefined ? undefined : oneOf(i.origin, ORIGINS, "origin"),
+    scope,
+    source,
+  };
+}
+
+function parseFileInput(raw: unknown): FileInput {
+  const i = record(raw, "input");
+  return {
+    ...parseNoteInput(raw),
+    fileName: textString(i.fileName, MAX_TEXT, "file name"),
+    fileSize: optionalText(i.fileSize, 50, "file size"),
+    fileUrl: optionalText(i.fileUrl, MAX_TEXT, "file url"),
+    previewUrl: optionalText(i.previewUrl, MAX_TEXT, "preview url"),
+  };
+}
+
+export async function addNote(raw: NoteInput) {
+  const input = parseNoteInput(raw);
   const { user: u } = await requireCustomerAccess(input.nodeId);
   const id = uid("i");
   const at = new Date().toISOString();
@@ -57,12 +98,13 @@ export async function addNote(input: { nodeId: string; title: string; content: s
   return id;
 }
 
-type FileInput = { nodeId: string; title: string; fileName: string; fileSize?: string; fileUrl?: string; previewUrl?: string; content: string; topic: string; category?: string; origin?: Item["origin"]; scope: string[]; source?: Item["source"] };
+type FileInput = NoteInput & { fileName: string; fileSize?: string; fileUrl?: string; previewUrl?: string };
 
 /** Link an existing file (seeded/mailbox document or an earlier upload) as a new item. URLs are checked by assertLinkableFile. */
-export async function addFile(input: FileInput) {
-  const { user: u } = await requireCustomerAccess(input.nodeId);
-  for (const url of [input.fileUrl, input.previewUrl]) if (url) assertLinkableFile(u, url);
+export async function addFile(raw: FileInput) {
+  const input = parseFileInput(raw);
+  const { user: u, node } = await requireCustomerAccess(input.nodeId);
+  for (const url of [input.fileUrl, input.previewUrl]) if (url) assertLinkableFile(u, url, node.companyId);
   return createFileItem(u, input);
 }
 
@@ -84,12 +126,9 @@ function createFileItem(u: Person, input: FileInput) {
   return id;
 }
 
-const MAX_FORM_FIELD = 200;
-const MAX_FORM_CONTENT = 20_000;
-
 /** Checks the upload form (it can be POSTed directly) and returns it typed, like validateIngestInput. Throws ValidationError. */
 function parseUploadForm(fd: FormData): { input: FileInput; file: File | null } {
-  const text = (name: string, max = MAX_FORM_FIELD) => {
+  const text = (name: string, max = MAX_TEXT) => {
     const v = fd.get(name) ?? "";
     if (typeof v !== "string" || v.length > max) throw new ValidationError(`Bad ${name}`);
     return v.trim();
@@ -102,7 +141,7 @@ function parseUploadForm(fd: FormData): { input: FileInput; file: File | null } 
   const file = raw && raw.size > 0 ? raw : null;
   const fileName = file?.name ?? (text("fileName") || "document.pdf");
   const scope = (text("scope") || "all").split(",").map((s) => s.trim()).filter(Boolean);
-  return { file, input: { nodeId, title: text("title") || fileName, fileName, content: text("content", MAX_FORM_CONTENT), topic: text("topic"), category: text("category"), origin, scope } };
+  return { file, input: { nodeId, title: text("title") || fileName, fileName, content: text("content", MAX_CONTENT), topic: text("topic"), category: text("category"), origin, scope } };
 }
 
 /** Real upload: validates and stores the file under data/uploads and creates the item. Called with a FormData from the upload form. */
@@ -113,12 +152,14 @@ export async function uploadFile(fd: FormData) {
   return createFileItem(user, stored ? { ...input, ...stored } : input);
 }
 
-/** Upload a new version of an existing document. */
+/** Upload a new version of an existing document (not a note: notes get versions by editing). */
 export async function uploadVersion(fd: FormData) {
-  const itemId = String(fd.get("itemId"));
-  const { user: u } = await requireItemAccess(itemId);
-  const note = String(fd.get("note") || "New version");
-  const file = fd.get("file") as File | null;
+  const itemId = idString(fd.get("itemId"), "item id");
+  const note = optionalText(fd.get("note"), MAX_TEXT, "note") || "New version";
+  const file = fd.get("file");
+  if (typeof file === "string") throw new ValidationError("Bad file");
+  const { user: u, item } = await requireItemAccess(itemId);
+  if (item.kind !== "file") throw new ValidationError("Only documents get new file versions");
   const stored = file && file.size > 0 ? await storeUpload(file) : null;
   saveDb((db) => {
     const it = db.items.find((i) => i.id === itemId);
@@ -137,8 +178,10 @@ export async function uploadVersion(fd: FormData) {
   revalidateAll();
 }
 
-export async function updateNote(itemId: string, content: string, note: string) {
-  const { user: u } = await requireItemAccess(itemId);
+export async function updateNote(itemId: string, rawContent: string, rawNote: string) {
+  const content = textString(rawContent, MAX_CONTENT, "content");
+  const note = optionalText(rawNote, MAX_TEXT, "note");
+  const { user: u } = await requireItemAccess(idString(itemId, "item id"));
   saveDb((db) => {
     const it = db.items.find((i) => i.id === itemId);
     if (!it) return;
@@ -152,7 +195,7 @@ export async function updateNote(itemId: string, content: string, note: string) 
 }
 
 export async function claimItem(itemId: string) {
-  const { user: u } = await requireItemAccess(itemId);
+  const { user: u } = await requireItemAccess(idString(itemId, "item id"));
   saveDb((db) => {
     const it = db.items.find((i) => i.id === itemId);
     if (!it) return;
@@ -163,8 +206,9 @@ export async function claimItem(itemId: string) {
   revalidateAll();
 }
 
-export async function addVersion(itemId: string, note: string) {
-  const { user: u } = await requireItemAccess(itemId);
+export async function addVersion(itemId: string, rawNote: string) {
+  const note = textString(rawNote, MAX_TEXT, "note");
+  const { user: u } = await requireItemAccess(idString(itemId, "item id"));
   saveDb((db) => {
     const it = db.items.find((i) => i.id === itemId);
     if (!it) return;
@@ -177,7 +221,7 @@ export async function addVersion(itemId: string, note: string) {
 }
 
 export async function archiveItem(itemId: string) {
-  const { user: u } = await requireItemAccess(itemId);
+  const { user: u } = await requireItemAccess(idString(itemId, "item id"));
   saveDb((db) => {
     const it = db.items.find((i) => i.id === itemId);
     if (!it) return;
@@ -188,7 +232,18 @@ export async function archiveItem(itemId: string) {
   revalidateAll();
 }
 
-export async function addNode(input: { companyId: string; parentId: string; name: string; type: "country" | "entity" | "division" | "team"; country?: string }) {
+/** Checks the add-node form: the types and countries it offers, a non-empty name. Throws ValidationError. */
+function parseNodeInput(raw: unknown) {
+  const i = record(raw, "node");
+  const name = textString(i.name, MAX_TEXT, "name").trim();
+  if (!name) throw new ValidationError("Bad name");
+  const country = optionalText(i.country, 2, "country") || undefined;
+  if (country !== undefined && !/^[A-Z]{2}$/.test(country)) throw new ValidationError("Bad country");
+  return { companyId: idString(i.companyId, "customer id"), parentId: idString(i.parentId, "parent id"), name, type: oneOf(i.type, NODE_TYPES, "node type"), country };
+}
+
+export async function addNode(raw: { companyId: string; parentId: string; name: string; type: "country" | "entity" | "division" | "team"; country?: string }) {
+  const input = parseNodeInput(raw);
   const { user: u, node: parent } = await requireCustomerAccess(input.parentId);
   await requireCompanyAccess(input.companyId);
   if (parent.companyId !== input.companyId) throw new AccessDeniedError();
@@ -209,7 +264,8 @@ export async function resetDemo() {
 
 // ---------- POC helpers used by the Teams / Outlook mock-ups ----------
 
-export async function suggestNode(text: string) {
+export async function suggestNode(rawText: string) {
+  const text = textString(rawText, MAX_CONTENT, "text");
   const u = await actor();
   const hit = detectNode(text, u.customerIds);
   if (!hit) return null;
@@ -238,7 +294,8 @@ export type BotAnswer = {
   alternatives?: { title: string; status: string }[];
 };
 
-export async function askBot(question: string): Promise<BotAnswer> {
+export async function askBot(rawQuestion: string): Promise<BotAnswer> {
+  const question = textString(rawQuestion, MAX_QUESTION, "question");
   const u = await actor();
   const guess = detectNode(question, u.customerIds);
   const hits = search(question, { companyIds: u.customerIds, companyId: guess?.node.companyId, country: guess?.node.country ?? undefined }).filter((h) => h.item.status === "active");
@@ -271,7 +328,7 @@ export async function askBot(question: string): Promise<BotAnswer> {
 }
 
 export async function nodeSummary(nodeId: string) {
-  const { node: n } = await requireCustomerAccess(nodeId);
+  const { node: n } = await requireCustomerAccess(idString(nodeId, "node id"));
   const db = getDb();
   const items = db.items.filter((i) => i.nodeId === nodeId && i.status === "active").map((i) => ({ id: i.id, title: i.title, kind: i.kind, owner: person(i.ownerId)?.name ?? null, updatedAt: i.updatedAt, category: i.category, origin: i.origin }));
   return { name: n.name, path: nodePath(nodeId).map((p) => p.name), items, experts: n.expertIds.map((e) => person(e)?.name).filter(Boolean) as string[] };

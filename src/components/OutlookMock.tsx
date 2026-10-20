@@ -2,16 +2,18 @@
 
 import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
-import { Mail, Inbox, Send, FileText, Archive, Trash2, Search, Reply, Forward, MoreHorizontal, Paperclip, ChevronRight, Check, ExternalLink, StickyNote, Star } from "lucide-react";
+import { Mail, Inbox, Send, FileText, Archive, Trash2, Search, Reply, Forward, MoreHorizontal, Paperclip, ChevronRight, Check, ExternalLink, StickyNote, Star, SquarePen } from "lucide-react";
 import { suggestNode, nodeSummary, addFile } from "@/lib/actions";
 import { ingestText, type Ingested } from "@/lib/leaf-actions";
 import { DEMO_MAILS, mailIngestInput, type DemoMail } from "@/lib/demo-mails";
+import { OutlookCompose } from "./OutlookCompose";
 import { LeafStatusBadge, LeafTypeBadge, ReconfirmedLabel, leavesLabel } from "./LeafBadges";
 
 const mails = DEMO_MAILS;
 
 export function OutlookMock() {
   const [sel, setSel] = useState(mails[0]);
+  const [composing, setComposing] = useState(false);
 
   return (
     <div className="flex h-screen bg-[#f3f2f1] text-[#242424]">
@@ -20,6 +22,7 @@ export function OutlookMock() {
         <span className="mt-auto mb-4 grid h-8 w-8 place-items-center rounded-full bg-violet-500 text-[11px] font-semibold text-white">LV</span>
       </div>
       <div className="flex w-[170px] flex-col border-r border-[#e1dfdd] bg-[#faf9f8] pt-3">
+        <button onClick={() => setComposing(true)} className="mx-2 mb-3 flex items-center justify-center gap-1.5 rounded bg-[#0f6cbd] px-2 py-1.5 text-[13px] font-medium text-white hover:bg-[#115ea3]"><SquarePen className="h-4 w-4" /> New mail</button>
         <div className="px-4 pb-2 text-[12px] font-semibold text-[#605e5c]">lena.vermeulen@sdworx.com</div>
         {[["Inbox", Inbox, mails.length], ["Sent", Send, 0], ["Drafts", FileText, 1], ["Archive", Archive, 0], ["Deleted", Trash2, 0]].map(([l, I, n], i) => { const Icon = I as typeof Inbox; return (
           <div key={l as string} className={`mx-2 flex items-center gap-2 rounded px-2 py-1.5 text-[13px] ${i === 0 ? "bg-[#edebe9] font-semibold" : ""}`}><Icon className="h-4 w-4 text-[#605e5c]" />{l as string}{(n as number) > 0 && <span className="ml-auto text-[11px] text-[#0f6cbd]">{n as number}</span>}</div>); })}
@@ -28,7 +31,7 @@ export function OutlookMock() {
         <div className="flex items-center gap-2 border-b border-[#e1dfdd] px-3 py-2"><div className="flex flex-1 items-center gap-2 rounded bg-[#f3f2f1] px-2 py-1.5 text-[12px] text-[#605e5c]"><Search className="h-3.5 w-3.5" /> Search</div></div>
         <div className="px-3 py-2 text-[12px] font-semibold">Focused</div>
         {mails.map((m) => (
-          <button key={m.id} onClick={() => setSel(m)} className={`border-l-[3px] px-3 py-2.5 text-left ${sel.id === m.id ? "border-[#0f6cbd] bg-[#edebe9]" : "border-transparent hover:bg-[#f3f2f1]"}`}>
+          <button key={m.id} onClick={() => { setSel(m); setComposing(false); }} className={`border-l-[3px] px-3 py-2.5 text-left ${!composing && sel.id === m.id ? "border-[#0f6cbd] bg-[#edebe9]" : "border-transparent hover:bg-[#f3f2f1]"}`}>
             <div className="flex justify-between text-[12.5px]"><span className={m.unread ? "font-bold" : "font-medium"}>{m.from}</span><span className="text-[11px] text-[#605e5c]">{m.time}</span></div>
             <div className={`truncate text-[12.5px] ${m.unread ? "font-semibold text-[#0f6cbd]" : ""}`}>{m.subject}</div>
             <div className="truncate text-[11.5px] text-[#605e5c]">{m.preview}</div>
@@ -36,6 +39,7 @@ export function OutlookMock() {
           </button>
         ))}
       </div>
+      {composing ? <OutlookCompose onClose={() => setComposing(false)} /> : <>
       <div className="flex min-w-0 flex-1 flex-col bg-white">
         <div className="flex items-center gap-2 overflow-hidden whitespace-nowrap border-b border-[#e1dfdd] px-4 py-2 text-[12.5px] text-[#242424]">
           {[["Reply", Reply], ["Forward", Forward]].map(([l, I]) => { const Icon = I as typeof Reply; return <span key={l as string} className="inline-flex items-center gap-1.5 rounded px-2 py-1 hover:bg-[#f3f2f1]"><Icon className="h-4 w-4 text-[#0f6cbd]" />{l as string}</span>; })}
@@ -53,6 +57,7 @@ export function OutlookMock() {
         </div>
       </div>
       <AddInPane key={sel.id} sel={sel} />
+      </>}
     </div>
   );
 }

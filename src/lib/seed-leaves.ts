@@ -11,14 +11,19 @@ import type { Leaf, LeafType, Channel } from "./types";
  * The demo adds 4 of Lena's (3 from the call, 1 from the 🍃 in Teams), so when scene 5 starts Jonas carries
  * 18 of 29 = 62% of what we know about Nike Germany, and Lena is the suggested successor.
  * Nothing seeded hangs on Nike Deutschland GmbH › Payroll, so the call, the conflict and the ×2 start clean.
+ * France has one leaf, confirmed 4 times (3 reconfirmations): the cutoff is the 20th (scene 2b, Lena's draft to Sarah says the 15th).
  * Belgium gets a few of Sofie's leaves so the rest of the tree has leaves too (fewer than Jonas has in Germany).
  */
 
-type L = { id: string; by: string; daysAgo: number; nodeId: string; channel: Channel; from: string; type: LeafType; category: string; statement: string; why?: string; quote: string; people?: string[] };
+/** A later message that said the same thing again (×n), `daysAgo` before the reset. */
+type Heard = { daysAgo: number; by: string; channel: Channel; from: string };
+type L = { id: string; by: string; daysAgo: number; nodeId: string; channel: Channel; from: string; type: LeafType; category: string; statement: string; why?: string; quote: string; people?: string[]; heard?: Heard[] };
 
 const KATRIN = "Katrin Vogel <katrin.vogel@nike.com>";
 const UWE = "Uwe Brandt <uwe.brandt@nike.com>";
 const BART = "Bart Claes <bart.claes@nike.com>";
+const JULIEN = "Julien Moreau <julien.moreau@nike.fr>";
+const SARAH = "Sarah Laurent <sarah@nike.fr>";
 
 const raw: L[] = [
   // ---- Germany: Jonas (15)
@@ -51,6 +56,14 @@ const raw: L[] = [
   { id: "sl-be-2", by: "sofie", daysAgo: 2, nodeId: "nk-be-elc", channel: "call", from: BART, type: "promise", category: "time", statement: "Sofie checks the night shift premiums of the ELC Laakdal October run before Friday.", quote: "I'll check the night shift premiums before Friday", people: ["Bart Claes"] },
   { id: "sl-be-3", by: "sofie", daysAgo: 80, nodeId: "nk-be-retail", channel: "mail", from: BART, type: "decision", category: "hr-admin", statement: "Meal vouchers at Nike Retail Belgium stay at 8 euro in 2027.", why: "Agreed in the 2026 negotiation with the unions.", quote: "meal vouchers stay at 8 euro next year", people: ["Bart Claes"] },
   { id: "sl-be-4", by: "sofie", daysAgo: 18, nodeId: "nk-be-elc", channel: "teams", from: "Sofie De Smet", type: "risk", category: "hr-admin", statement: "Peak season temp workers at ELC Laakdal are often declared late in Dimona.", quote: "the peak season temps are often late in Dimona" },
+  // ---- France (scene 2b, second thought): the finance contact's mail of early March (231 days before the
+  // recording day, 20 October), said again 3 times since by other people (×4), so it doesn't weigh on the knowledge risk.
+  { id: "sl-fr-1", by: "sofie", daysAgo: 231, nodeId: "nk-fr", channel: "mail", from: JULIEN, type: "decision", category: "payroll", statement: "Cutoff date for Nike France is the 20th.", quote: "the cutoff date for Nike France is the 20th of the month", people: ["Julien Moreau"],
+    heard: [
+      { daysAgo: 170, by: "marta", channel: "call", from: JULIEN },
+      { daysAgo: 110, by: "lena", channel: "mail", from: SARAH },
+      { daysAgo: 9, by: "lena", channel: "mail", from: SARAH },
+    ] },
 ];
 
 const DAY_MS = 86_400_000;
@@ -59,6 +72,7 @@ const DAY_MS = 86_400_000;
 export function seedLeavesAt(today: Date): Leaf[] {
   const midnight = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
   const at = (daysAgo: number) => new Date(midnight - daysAgo * DAY_MS + 10 * 3_600_000).toISOString();
+  const heard = (l: L) => (l.heard ?? []).map((h, i) => ({ channel: h.channel, trigger: "auto" as const, ref: `seed:${l.id}:${i + 1}`, at: at(h.daysAgo), byId: h.by, from: h.from }));
   return raw.map((l) => ({
     id: l.id,
     nodeId: l.nodeId,
@@ -71,7 +85,8 @@ export function seedLeavesAt(today: Date): Leaf[] {
     source: { channel: l.channel, trigger: "auto", ref: `seed:${l.id}`, at: at(l.daysAgo), byId: l.by, from: l.from },
     confidence: 0.9,
     status: "auto",
-    reconfirmedAt: [],
+    reconfirmedAt: heard(l).map((h) => h.at),
+    ...(l.heard ? { reconfirmedBy: heard(l) } : {}),
     usefulCount: 0,
   }));
 }

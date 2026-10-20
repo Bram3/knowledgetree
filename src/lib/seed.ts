@@ -1,5 +1,6 @@
 import type { Db, Item } from "./types";
 import { seedLeaves } from "./seed-leaves";
+import { personCard } from "./people";
 
 // Demo clock: 2026-09-30
 const d = (daysAgo: number, hour = 10) => {
@@ -8,14 +9,16 @@ const d = (daysAgo: number, hour = 10) => {
   return t.toISOString();
 };
 
+// Name, initials and colour come from people.ts (client-safe); the rest stays on the server.
+const card = (id: string) => personCard(id)!;
 const people = [
-  { id: "lena", name: "Lena Vermeulen", role: "Payroll Consultant", initials: "LV", color: "bg-[#001c52]", email: "lena.vermeulen@sdworx.com", customerIds: ["nike", "vandervalk"] },
-  { id: "sofie", name: "Sofie De Smet", role: "Senior Payroll Consultant", initials: "SD", color: "bg-[#f1002f]", email: "sofie.desmet@sdworx.com", customerIds: ["nike", "vrt", "basicfit"] },
-  { id: "jonas", name: "Jonas Becker", role: "Payroll Expert Germany", initials: "JB", color: "bg-[#006dd8]", email: "jonas.becker@sdworx.com", customerIds: ["nike", "arcelormittal"] },
-  { id: "marta", name: "Marta Kowalski", role: "Account Lead", initials: "MK", color: "bg-[#f28f29]", email: "marta.kowalski@sdworx.com", customerIds: ["nike", "arcelormittal"] },
-  { id: "pieter", name: "Pieter Janssens", role: "Payroll Consultant NL", initials: "PJ", color: "bg-[#009559]", email: "pieter.janssens@sdworx.com", customerIds: ["vandervalk", "basicfit"] },
-  { id: "amelie", name: "Amélie Dubois", role: "HR Services Consultant FR", initials: "AD", color: "bg-[#9051e1]", email: "amelie.dubois@sdworx.com", customerIds: ["basicfit", "arcelormittal"] },
-  { id: "tom", name: "Tom Verhaeghe", role: "Legal & Compliance", initials: "TV", color: "bg-[#737476]", email: "tom.verhaeghe@sdworx.com", customerIds: ["nike", "vandervalk", "vrt", "arcelormittal", "basicfit"] },
+  { ...card("lena"), role: "Payroll Consultant", email: "lena.vermeulen@sdworx.com", customerIds: ["nike", "vandervalk"] },
+  { ...card("sofie"), role: "Senior Payroll Consultant", email: "sofie.desmet@sdworx.com", customerIds: ["nike", "vrt", "basicfit"] },
+  { ...card("jonas"), role: "Payroll Expert Germany", email: "jonas.becker@sdworx.com", customerIds: ["nike", "arcelormittal"] },
+  { ...card("marta"), role: "Account Lead", email: "marta.kowalski@sdworx.com", customerIds: ["nike", "arcelormittal"] },
+  { ...card("pieter"), role: "Payroll Consultant NL", email: "pieter.janssens@sdworx.com", customerIds: ["vandervalk", "basicfit"] },
+  { ...card("amelie"), role: "HR Services Consultant FR", email: "amelie.dubois@sdworx.com", customerIds: ["basicfit", "arcelormittal"] },
+  { ...card("tom"), role: "Legal & Compliance", email: "tom.verhaeghe@sdworx.com", customerIds: ["nike", "vandervalk", "vrt", "arcelormittal", "basicfit"] },
 ];
 
 const companies = [
@@ -37,6 +40,8 @@ const nodes = [
   { id: "nk-de", companyId: "nike", parentId: "nk", name: "Germany", type: "country" as const, country: "DE", expertIds: ["jonas"], contacts: [{ name: "Katrin Vogel", role: "Head of Payroll Germany", email: "katrin.vogel@nike.com" }] },
   { id: "nk-de-gmbh", companyId: "nike", parentId: "nk-de", name: "Nike Deutschland GmbH", type: "entity" as const, country: "DE", expertIds: ["jonas"] },
   { id: "nk-de-retail", companyId: "nike", parentId: "nk-de", name: "Nike Retail Germany", type: "entity" as const, country: "DE", expertIds: [] },
+  // Scene 2b (second thought): Nike France, where Lena drafts a mail to Sarah. Sofie owns the branch.
+  { id: "nk-fr", companyId: "nike", parentId: "nk", name: "France", type: "country" as const, country: "FR", expertIds: ["sofie"], contacts: [{ name: "Sarah Laurent", role: "HR Manager France", email: "sarah@nike.fr" }, { name: "Julien Moreau", role: "Finance Controller France", email: "julien.moreau@nike.fr" }] },
   // Van der Valk
   { id: "vv", companyId: "vandervalk", parentId: null, name: "Van der Valk Hotels", type: "group" as const, expertIds: ["pieter"] },
   { id: "vv-nl", companyId: "vandervalk", parentId: "vv", name: "Netherlands", type: "country" as const, country: "NL", expertIds: ["pieter"] },

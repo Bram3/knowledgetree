@@ -14,6 +14,10 @@ const ANSWERS: { choice: ConflictChoice; label: string; done: string; primary?: 
   { choice: "unsure", label: "Not sure", done: "Moved to your weekly digest." },
 ];
 
+/** #19: a draft's claim against a leaf; the branch owner says which one is right. */
+const LEAF_LABELS: Partial<Record<ConflictChoice, string>> = { correct: "New one is right", keep: "Keep the leaf" };
+const LEAF_DONE: Partial<Record<ConflictChoice, string>> = { correct: "New leaf verified. The old one fell.", keep: "Kept the leaf. The new claim fell." };
+
 /**
  * KnowledgeTree's only interruption: one card per conflict, for the owner of the contradicted note.
  * "Viewing as" lets the demo show Jonas's card without logging out (people who share a customer with you only).
@@ -43,7 +47,7 @@ export function ConflictCards() {
   const answer = (c: ConflictCard, a: (typeof ANSWERS)[number]) =>
     start(async () => {
       await answerConflict(c.leaf.id, a.choice, viewAs);
-      setAnswered((m) => ({ ...m, [c.leaf.id]: a.done }));
+      setAnswered((m) => ({ ...m, [c.leaf.id]: (c.against === "leaf" && LEAF_DONE[a.choice]) || a.done }));
     });
 
   const me = people.find((p) => p.id === viewAs);
@@ -75,10 +79,14 @@ export function ConflictCards() {
                   <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-slate-400">{c.path.map((p, i) => <span key={i} className="flex items-center gap-1">{i > 0 && <ChevronRight className="h-3 w-3" />}{p}</span>)}</div>
                   <blockquote className="mt-2 border-l-2 border-red-300 pl-2 text-[12px] italic text-slate-700">“{c.leaf.quote}”</blockquote>
                   <div className="mt-1 text-[11px] text-slate-500">{c.leaf.source.channel} · {c.leaf.source.from?.replace(/\s*<.*>$/, "") ?? "unknown"}{c.leaf.reconfirmedAt.length ? ` · heard ×${c.leaf.reconfirmedAt.length + 1}` : ""}</div>
-                  <Link href={`/customers/${c.companyId}?node=${c.leaf.nodeId}&cat=${c.leaf.category}&item=${c.note.id}`} className="mt-2 inline-flex items-center gap-1 text-[11.5px] text-sd-primary underline">Your note: {c.note.title} (v{c.note.version}) <ExternalLink className="h-3 w-3" /></Link>
+                  {c.against === "leaf" ? (
+                    <Link href={`/customers/${c.companyId}?node=${c.leaf.nodeId}&cat=${c.leaf.category}`} className="mt-2 inline-flex items-center gap-1 text-[11.5px] text-sd-primary underline">The leaf: {c.note.title} (×{c.note.version}) <ExternalLink className="h-3 w-3" /></Link>
+                  ) : (
+                    <Link href={`/customers/${c.companyId}?node=${c.leaf.nodeId}&cat=${c.leaf.category}&item=${c.note.id}`} className="mt-2 inline-flex items-center gap-1 text-[11.5px] text-sd-primary underline">Your note: {c.note.title} (v{c.note.version}) <ExternalLink className="h-3 w-3" /></Link>
+                  )}
                   <div className="mt-3 flex gap-1.5">
                     {ANSWERS.map((a) => (
-                      <button key={a.choice} disabled={pending} onClick={() => answer(c, a)} className={`flex-1 rounded-md px-2 py-1.5 text-[12px] font-medium disabled:opacity-50 ${a.primary ? "bg-[#5b5fc7] text-white" : "border border-[#e0e0e0] text-[#242424] hover:bg-[#f5f5f5]"}`}>{a.label}</button>
+                      <button key={a.choice} disabled={pending} onClick={() => answer(c, a)} className={`flex-1 rounded-md px-2 py-1.5 text-[12px] font-medium disabled:opacity-50 ${a.primary ? "bg-[#5b5fc7] text-white" : "border border-[#e0e0e0] text-[#242424] hover:bg-[#f5f5f5]"}`}>{c.against === "leaf" ? (LEAF_LABELS[a.choice] ?? a.label) : a.label}</button>
                     ))}
                   </div>
                 </div>

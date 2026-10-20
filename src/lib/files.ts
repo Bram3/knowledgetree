@@ -22,18 +22,34 @@ function canSee(user: Person, nodeId: string) {
 }
 
 /**
- * Throws AccessDeniedError unless `user` may attach the existing file at `url` to a new item.
- * Only `/files/<name>` (seeded or mailbox documents) and `/api/files/<name>` (uploads) are allowed,
- * and only if every item already pointing at that URL belongs to a customer the user is assigned to.
+ * Throws AccessDeniedError unless `user` may attach the existing file at `url` to a new item on customer `companyId`.
+ * Only `/files/<name>` (seeded or mailbox documents) and `/api/files/<name>` (uploads) are allowed.
+ * A file items already point at may only be linked again on that same customer (one the user is assigned to);
+ * a file nobody points at yet only if it is a mailbox attachment of that customer.
  * Without this, pointing a new item at another customer's file URL would unlock that file.
  */
-export function assertLinkableFile(user: Person, url: string) {
+export function assertLinkableFile(user: Person, url: string, companyId: string) {
   const m = /^\/(files|api\/files)\/([A-Za-z0-9._-]+)$/.exec(url);
-  if (!m || m[2].startsWith(".")) throw new AccessDeniedError();
+  if (!m || m[2].startsWith(".") || !canAccess(user, companyId)) throw new AccessDeniedError();
+  const isSeed = m[1] === "files";
+  if (isSeed && !fs.existsSync(path.join(SEED_FILES_DIR, m[2]))) throw new AccessDeniedError();
   const refs = itemsReferencing(url);
-  if (!refs.every((i) => canSee(user, i.nodeId))) throw new AccessDeniedError();
-  if (m[1] === "files" ? !fs.existsSync(path.join(SEED_FILES_DIR, m[2])) : refs.length === 0) throw new AccessDeniedError();
+  if (refs.length > 0) {
+    if (!refs.every((i) => canSee(user, i.nodeId) && node(i.nodeId)?.companyId === companyId)) throw new AccessDeniedError();
+    return;
+  }
+  // Nobody filed it yet: only a mailbox attachment of this customer.
+  if (!isSeed || MAILBOX_ATTACHMENTS[m[2]] !== companyId) throw new AccessDeniedError();
 }
+
+/**
+ * Seeded documents that no item references until someone files them from the Outlook mock,
+ * with the customer they belong to. Any other unreferenced file can't be linked.
+ */
+const MAILBOX_ATTACHMENTS: Record<string, string> = {
+  "Nike_DE_Payroll_Calendar_Q4_2026.xlsx": "nike",
+  "att-nike-de-calendar.pdf": "nike",
+};
 
 /** RFC 6266 Content-Disposition: ASCII fallback plus RFC 5987 UTF-8 name. Only PDFs are inline. */
 export function contentDisposition(fileName: string, inline: boolean) {

@@ -15,6 +15,7 @@ Usage: python3 scripts/generate_call_audio.py
 import base64
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -49,8 +50,15 @@ def gcloud(*args: str) -> str:
     return subprocess.check_output(["gcloud", *args], text=True).strip()
 
 
+# Project, location and model end up in the URL that receives our access token: only plain ids.
+SAFE_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,99}$")
+
+
 def endpoint(project: str, location: str, model: str) -> str:
-    host = "aiplatform.googleapis.com" if location == "global" else f"{location}-aiplatform.googleapis.com"
+    for name, value in (("GOOGLE_CLOUD_PROJECT", project), ("GOOGLE_CLOUD_LOCATION", location), ("GEMINI_TTS_MODEL", model)):
+        if not SAFE_ID.match(value):
+            raise ValueError(f"{name} must be a plain id (lowercase letters, digits, '.', '_', '-'), got {value!r}")
+    host ="aiplatform.googleapis.com" if location == "global" else f"{location}-aiplatform.googleapis.com"
     return (
         f"https://{host}/v1/projects/{project}/locations/{location}"
         f"/publishers/google/models/{model}:generateContent"
