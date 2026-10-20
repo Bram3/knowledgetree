@@ -7,11 +7,11 @@ import { getDb, resetDb, person } from "./db";
 import { AccessDeniedError } from "./access";
 import type { ModelClient } from "./gemini";
 
-/** Lena's call with Katrin: the cutoff moves to the 20th, which contradicts Jonas's note (the 18th). */
+/** Lena's call with Katrin: the cutoff moves to the 20th, which contradicts Jonas's note (the 15th). */
 const CALL = "Katrin: from next month the payroll cutoff for Nike Deutschland GmbH moves from the 15th to the 20th.";
 const model: ModelClient = {
   generate: async (req) => JSON.stringify(JSON.stringify(req.schema).includes('"relation"')
-    ? (JSON.stringify(req.parts).includes("moves to the 18th") ? { relation: "contradicts", said: "the 20th", noted: "the 18th" } : { relation: "unrelated", said: null, noted: null })
+    ? (JSON.stringify(req.parts).includes("Payroll cutoff Germany: the 15th") ? { relation: "contradicts", said: "the 20th", noted: "the 15th" } : { relation: "unrelated", said: null, noted: null })
     : { leaves: [{ type: "change", statement: "From next month the payroll cutoff for Nike Deutschland GmbH moves to the 20th.", why: null, quote: "from next month the payroll cutoff for Nike Deutschland GmbH moves from the 15th to the 20th", people: ["Katrin Vogel"], confidence: 0.92, nodeId: "nk-de-gmbh", category: "payroll" }] }),
 };
 
@@ -31,7 +31,7 @@ describe("the owner's conflict card", () => {
   it("Jonas sees exactly one card, nobody else gets one", async () => {
     const leaf = await callWithKatrin();
     await signInAs("jonas");
-    expect(await conflictCards()).toMatchObject([{ leaf: { id: leaf.id }, note: { id: "i-nk-de-cutoff-new", version: 2 }, text: "Katrin said the 20th, your note says the 18th." }]);
+    expect(await conflictCards()).toMatchObject([{ leaf: { id: leaf.id }, note: { id: "i-nk-de-cutoff-new", version: 2 }, text: "Katrin said the 20th, your note says the 15th." }]);
     for (const id of ["lena", "tom", "sofie", "marta"]) {
       await signInAs(id);
       expect(await conflictCards()).toEqual([]);
@@ -71,7 +71,7 @@ describe("one tap", () => {
     const n = note();
     expect(n.versions).toHaveLength(3);
     expect(n.versions[2]).toMatchObject({ version: 3, byId: "jonas", source: { channel: "call", ref: "call:katrin-1", leafId: leaf.id }, note: expect.stringContaining("Katrin Vogel said the 20th") });
-    expect(n.title).toBe("Payroll cutoff Germany moves to the 20th");
+    expect(n.title).toBe("Payroll cutoff Germany: the 20th of the month");
     expect(n.content).toContain("moves to the 20th");
     expect(getLeaf(leaf.id)).toMatchObject({ status: "verified", verifiedById: "jonas" });
     expect(await conflictCards()).toEqual([]);

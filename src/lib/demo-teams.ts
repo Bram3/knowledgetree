@@ -6,8 +6,9 @@ export type DemoTeamsMessage = { id: string; from: string; initials: string; col
 
 export const DEMO_TEAMS_MESSAGES: DemoTeamsMessage[] = [
   { id: "m1", from: "Sofie De Smet", initials: "SD", color: "bg-[#f1002f]", at: "09:12", text: "Morning Lena! Handing Nike over to you as discussed. Most of it is in the tree already, the rest I will add this week." },
-  { id: "m2", from: "Lena Vermeulen", initials: "LV", color: "bg-[#001c52]", at: "09:14", text: "Thanks Sofie! Katrin from Nike Germany just asked what the payroll cutoff is, she heard it changed?", me: true },
-  { id: "m3", from: "Sofie De Smet", initials: "SD", color: "bg-[#f1002f]", at: "09:16", text: "Yes, FYI Nike Deutschland GmbH confirmed the payroll cutoff moves to the 18th from the October run (was the 15th). Pay date stays the 25th. Katrin will send the new calendar by mail. Jonas already knows." },
+  { id: "m2", from: "Lena Vermeulen", initials: "LV", color: "bg-[#001c52]", at: "09:14", text: "Thanks Sofie! Just had Katrin from Nike Germany on the phone about their new time registration system. Anything I should watch out for?", me: true },
+  // Scene 2: the 🍃 on this message. A useful attention point for the first runs on the new time system.
+  { id: "m3", from: "Sofie De Smet", initials: "SD", color: "bg-[#f1002f]", at: "09:16", text: "Yes, one thing: since the switch, Nike Deutschland GmbH sends overtime in a separate export, not in the hours file. Always load both files before the cutoff, otherwise the overtime is missing from the payroll run." },
 ];
 
 /** The ingest input for a 🍃 reaction: the message text, the message id as source ref, the author as "who said it". */

@@ -25,6 +25,24 @@ export type CompareSide = { statement: string; quote: string };
 export const describeNote = (n: { title: string; content: string }) => `NOTE "${n.title}":\n${n.content}`;
 export const describeLeaf = (l: CompareSide) => `LEAF:\n${l.statement}\nQuote: "${l.quote}"`;
 
+/**
+ * A note after its owner tapped "Correct" on a conflict: the noted claim in the title becomes the said one, and
+ * the content gets an update line on top. No date in the text (the version carries it), so the corrected note,
+ * and so every later comparison against it, has a stable cache key: the demo cache can hold it.
+ */
+export function correctedNote(note: { title: string; content: string }, leaf: { statement: string; channel: string; saidBy: string }, claims: { said: string; noted: string }) {
+  return {
+    title: replaceClaim(note.title, claims.noted, claims.said),
+    content: `> **Update:** ${leaf.statement} Source: ${leaf.channel} with ${leaf.saidBy}.\n\n${note.content}`,
+  };
+}
+
+/** "Payroll cutoff Germany: the 15th of the month" with noted "the 15th", said "the 20th" → "… the 20th of the month". */
+function replaceClaim(title: string, noted: string, said: string) {
+  const i = title.toLowerCase().indexOf(noted.toLowerCase());
+  return i < 0 ? title : title.slice(0, i) + said + title.slice(i + noted.length);
+}
+
 /** The user text of one comparison; also the cache key input (`cacheKeyFor("compare", text)`). */
 export function compareText(leaf: CompareSide & { channel: string; saidBy: string }, existing: string) {
   return `NEW (${leaf.channel}, said by ${leaf.saidBy}):\n${leaf.statement}\nQuote: "${leaf.quote}"\n\nEXISTING ${existing}`;

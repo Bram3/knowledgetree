@@ -30,7 +30,7 @@ describe("leaf store", () => {
     const counts = leafCounts("nike", NOW);
     expect(counts["nk-de-gmbh"]).toEqual({ total: 2, seeds: 0, fallen: 1, byCategory: { payroll: 1, time: 1 }, seasons: { ...NONE, green: 2 }, categorySeasons: { payroll: { ...NONE, green: 1 }, time: { ...NONE, green: 1 } }, conflicts: 0, categoryConflicts: {} });
     expect(counts["nk"]).toEqual({ total: 1, seeds: 1, fallen: 0, byCategory: {}, seasons: NONE, categorySeasons: {}, conflicts: 0, categoryConflicts: {} });
-    expect(counts["nk-be"]).toEqual({ total: 0, seeds: 0, fallen: 0, byCategory: {}, seasons: NONE, categorySeasons: {}, conflicts: 0, categoryConflicts: {} });
+    expect(counts["nk-nl"]).toEqual({ total: 0, seeds: 0, fallen: 0, byCategory: {}, seasons: NONE, categorySeasons: {}, conflicts: 0, categoryConflicts: {} });
     expect(leafCounts("basicfit", NOW)["nk"]).toBeUndefined();
   });
 
