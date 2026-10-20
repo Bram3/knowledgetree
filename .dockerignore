@@ -8,3 +8,5 @@ data/uploads
 CLAUDE.md
 AGENTS.md
 .claude
+.env*
+!.env.example
