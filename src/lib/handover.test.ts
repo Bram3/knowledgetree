@@ -115,12 +115,13 @@ describe("handover brief", () => {
     expect(dryRun.source.quote).toBe("we do a dry run on the new export before the first payroll");
   });
 
-  it("lists open conflicts on the handed-over knowledge", () => {
-    addLeaves([{ ...getLeaf("sl-jb-10")!, id: "x-conflict", statement: "Payslips stay German only.", quote: "payslips stay in German", status: "conflict", conflictsWith: "sl-jb-10" }]);
+  it("lists open conflicts on the handed-over notes, also when someone else caught the leaf", () => {
+    // One of Lena's leaves, so it isn't handed over itself: only the note it contradicts is.
+    addLeaves([{ ...getLeaf("sl-lv-6")!, id: "x-conflict", nodeId: "nk-de-gmbh", statement: "The cutoff moves to the 20th.", quote: "the cutoff moves to the 20th", status: "conflict", conflictsWith: "i-nk-de-cutoff-new" }]);
     const b = handoverBrief(p("lena"), handToLena().id, NOW);
     expect(b.conflicts).toHaveLength(1);
-    expect(b.conflicts[0].text).toContain("Payslips stay German only.");
-    expect(b.conflicts[0].text).toContain("Nike Germany wants the payslip PDFs in German and English from 2027.");
+    expect(b.conflicts[0].text).toContain("The cutoff moves to the 20th.");
+    expect(b.conflicts[0].text).toContain("Payroll cutoff Germany: the 15th of the month");
   });
 
   it("only people on the customer can open it", () => {

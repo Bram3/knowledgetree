@@ -227,8 +227,9 @@ export function handoverBrief(user: Person, handoverId: string, now: Date): Hand
   const c = assertCompanyAccess(user, h.companyId);
   const db = getDb();
   const leafIds = new Set(h.leafIds);
+  const itemIds = new Set(h.itemIds);
   const leaves = db.leaves.filter((l) => leafIds.has(l.id) && isCurrent(l, now)); // faded leaves aren't current facts
-  const items = db.items.filter((i) => h.itemIds.includes(i.id) && i.status === "active");
+  const items = db.items.filter((i) => itemIds.has(i.id) && i.status === "active");
   const base = `/customers/${c.id}`;
 
   const facts: BriefPoint[] = [
@@ -237,10 +238,11 @@ export function handoverBrief(user: Person, handoverId: string, now: Date): Hand
   ];
   const attention = leaves.filter((l) => l.status !== "conflict" && (l.type === "attention" || l.type === "risk")).map((l) => ({ text: l.statement, source: leafSource(l, c.id) }));
 
-  const conflicting = db.leaves.filter((l) => l.status === "conflict" && isLive(l) && (leafIds.has(l.id) || (l.conflictsWith && leafIds.has(l.conflictsWith))));
+  // A conflict is a leaf that contradicts a note (`conflictsWith` is the note's id).
+  const conflicting = db.leaves.filter((l) => l.status === "conflict" && isLive(l) && (leafIds.has(l.id) || (l.conflictsWith && itemIds.has(l.conflictsWith))));
   const conflicts = conflicting.map((l) => {
-    const other = l.conflictsWith ? db.leaves.find((x) => x.id === l.conflictsWith) : undefined;
-    return { text: other ? `${l.statement} Conflicts with: ${other.statement}` : l.statement, source: leafSource(l, c.id) };
+    const note = l.conflictsWith ? db.items.find((i) => i.id === l.conflictsWith) : undefined;
+    return { text: note ? `${l.statement} Conflicts with the note: ${note.title}` : l.statement, source: leafSource(l, c.id) };
   });
 
   // People to call: the previous owner, the customer contacts on the branches involved, people named in the leaves.
