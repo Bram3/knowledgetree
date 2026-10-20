@@ -1,6 +1,6 @@
 import "@/test/next-mocks";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, person, recentActivity, resetDb } from "./db";
+import { getDb, person, recentActivity, resetDb, saveDb } from "./db";
 import { customerRisk, handOver, handoverBrief, holdings, leafOwnerId, markRoleChange, orphanedKnowledge, successorCandidates } from "./handover";
 import { addLeaves, getLeaf } from "./leaves";
 import { AccessDeniedError } from "./access";
@@ -18,6 +18,38 @@ describe("knowledge risk", () => {
   it("only current knowledge counts: a fallen leaf from Jonas doesn't raise it", () => {
     addLeaves([{ ...getLeaf("sl-jb-1")!, id: "old-promise", type: "promise", source: { ...getLeaf("sl-jb-1")!.source, at: "2026-01-01T10:00:00Z" } }]);
     expect(customerRisk("nike", NOW)?.percent).toBe(72);
+  });
+});
+
+describe("knowledge that comes only from one person", () => {
+  const heardBy = (byId: string) => ({ channel: "mail" as const, trigger: "auto" as const, ref: `outlook:${byId}`, at: NOW.toISOString(), byId });
+  const reconfirmLeaf = (id: string, byId: string) => saveDb((db) => void (db.leaves.find((l) => l.id === id)!.reconfirmedBy = [heardBy(byId)]));
+  const reconfirmNote = (id: string, byId: string) => saveDb((db) => void (db.items.find((i) => i.id === id)!.reconfirmedBy = [heardBy(byId)]));
+
+  it("a leaf of Jonas that Lena heard again no longer counts as only his, in the risk and in the banner", () => {
+    reconfirmLeaf("sl-jb-1", "lena");
+    expect(customerRisk("nike", NOW)).toMatchObject({ personId: "jonas", count: 17, total: 25, percent: 68 });
+    markRoleChange(p("marta"), "jonas", "nike");
+    expect(orphanedKnowledge("nike")[0].leafIds).not.toContain("sl-jb-1");
+    expect(orphanedKnowledge("nike")[0].leafIds).toHaveLength(14);
+  });
+
+  it("the same goes for a note someone else reconfirmed", () => {
+    reconfirmNote("i-nk-de-time", "sofie");
+    expect(customerRisk("nike", NOW)).toMatchObject({ personId: "jonas", count: 17, percent: 68 });
+    markRoleChange(p("marta"), "jonas", "nike");
+    expect(orphanedKnowledge("nike")[0].itemIds).not.toContain("i-nk-de-time");
+  });
+
+  it("hearing it again yourself keeps it yours", () => {
+    reconfirmLeaf("sl-jb-1", "jonas");
+    expect(customerRisk("nike", NOW)?.percent).toBe(72);
+  });
+
+  it("the banner counts what Jonas contributed, not what he happens to own", () => {
+    saveDb((db) => void (db.items.find((i) => i.id === "i-nk-de-onboarding")!.ownerId = "jonas")); // Sofie's checklist, claimed by Jonas
+    markRoleChange(p("marta"), "jonas", "nike");
+    expect(orphanedKnowledge("nike")[0].itemIds).not.toContain("i-nk-de-onboarding");
   });
 });
 
@@ -115,12 +147,13 @@ describe("handover brief", () => {
     expect(dryRun.source.quote).toBe("we do a dry run on the new export before the first payroll");
   });
 
-  it("lists open conflicts on the handed-over knowledge", () => {
-    addLeaves([{ ...getLeaf("sl-jb-10")!, id: "x-conflict", statement: "Payslips stay German only.", quote: "payslips stay in German", status: "conflict", conflictsWith: "sl-jb-10" }]);
+  it("lists open conflicts on the handed-over notes, also when someone else caught the leaf", () => {
+    // One of Lena's leaves, so it isn't handed over itself: only the note it contradicts is.
+    addLeaves([{ ...getLeaf("sl-lv-6")!, id: "x-conflict", nodeId: "nk-de-gmbh", statement: "The cutoff moves to the 20th.", quote: "the cutoff moves to the 20th", status: "conflict", conflictsWith: "i-nk-de-cutoff-new" }]);
     const b = handoverBrief(p("lena"), handToLena().id, NOW);
     expect(b.conflicts).toHaveLength(1);
-    expect(b.conflicts[0].text).toContain("Payslips stay German only.");
-    expect(b.conflicts[0].text).toContain("Nike Germany wants the payslip PDFs in German and English from 2027.");
+    expect(b.conflicts[0].text).toContain("The cutoff moves to the 20th.");
+    expect(b.conflicts[0].text).toContain("Payroll cutoff Germany: the 15th of the month");
   });
 
   it("only people on the customer can open it", () => {

@@ -4,7 +4,7 @@ import { assertItemAccess, assertNodeAccess, AccessDeniedError } from "./access"
 import { canAccess } from "./auth";
 import { generate, cacheKeyFor, type ModelClient } from "./gemini";
 import { COMPARE_SYSTEM, COMPARE_SCHEMA, compareText, correctedNote, describeLeaf, describeNote } from "./compare-prompt";
-import type { ActivityAction, Db, Leaf, LeafSource, Person } from "./types";
+import type { ActivityAction, Db, Item, Leaf, LeafSource, Person } from "./types";
 
 /**
  * COMPARE (step 5 of the pipeline) and the owner's one-tap answer to a conflict.
@@ -23,11 +23,15 @@ type Judgement = { relation: Relation; said: string | null; noted: string | null
 export type CompareOutcome = {
   fresh: Leaf[]; // leaves to store (status "conflict" when they contradict a note)
   reconfirm: { leafId: string; source: LeafSource }[]; // existing leaves heard again
+  reconfirmNotes: { itemId: string; source: LeafSource }[]; // notes heard again
 };
+
+/** A note that a message said again: no leaf is made, the note records the source. */
+export type ReconfirmedNote = { id: string; title: string; nodeId: string; times: number };
 
 /** Compares freshly extracted leaves with what already hangs on their node › category. Does not write. */
 export async function compareLeaves(leaves: Leaf[], model?: ModelClient): Promise<CompareOutcome> {
-  const out: CompareOutcome = { fresh: [], reconfirm: [] };
+  const out: CompareOutcome = { fresh: [], reconfirm: [], reconfirmNotes: [] };
   const db = getDb();
   for (const leaf of leaves) {
     if (leaf.status !== "auto") {
@@ -45,6 +49,11 @@ export async function compareLeaves(leaves: Leaf[], model?: ModelClient): Promis
       out.reconfirm.push({ leafId: same.id, source: leaf.source });
       continue;
     }
+    const sameNote = notes.find((_, i) => onNotes[i].relation === "same");
+    if (sameNote) {
+      if (!out.reconfirmNotes.some((r) => r.itemId === sameNote.id)) out.reconfirmNotes.push({ itemId: sameNote.id, source: leaf.source });
+      continue;
+    }
     const hit = notes.findIndex((_, i) => onNotes[i].relation === "contradicts");
     if (hit >= 0) {
       const note = notes[hit];
@@ -59,9 +68,17 @@ export async function compareLeaves(leaves: Leaf[], model?: ModelClient): Promis
 }
 
 /** Writes the side effects of a comparison (after the fresh leaves are stored): reconfirmations and the Changes feed. */
-export function recordCompare(user: Person, outcome: CompareOutcome): Leaf[] {
+export function recordCompare(user: Person, outcome: CompareOutcome): { reconfirmed: Leaf[]; reconfirmedNotes: ReconfirmedNote[] } {
   const reconfirmed: Leaf[] = [];
+  const reconfirmedNotes: ReconfirmedNote[] = [];
   saveDb((db) => {
+    for (const r of outcome.reconfirmNotes) {
+      const it = db.items.find((i) => i.id === r.itemId);
+      if (!it) continue;
+      (it.reconfirmedBy ??= []).push(r.source);
+      log(db, "leaf_reconfirmed", it.nodeId, user.id, `heard again from ${saidBy(r.source)} (${r.source.channel}): "${it.title}" ×${it.reconfirmedBy.length + 1}`, it.id);
+      reconfirmedNotes.push(noteRef(it));
+    }
     for (const r of outcome.reconfirm) {
       const l = db.leaves.find((x) => x.id === r.leafId);
       if (!l) continue;
@@ -74,15 +91,23 @@ export function recordCompare(user: Person, outcome: CompareOutcome): Leaf[] {
       if (l.status !== "conflict") continue;
       const note = db.items.find((i) => i.id === l.conflictsWith);
       const owner = person(note?.ownerId);
-      log(db, "leaf_conflict", l.nodeId, user.id, `caught a ${l.source.channel} from ${saidBy(l.source)} that conflicts with "${note?.title}": ${l.conflictClaims?.said} vs ${l.conflictClaims?.noted}.${owner ? ` Asked ${owner.name}.` : ""}`, note?.id);
+      log(db, "leaf_conflict", l.nodeId, user.id, `caught a ${l.source.channel} from ${saidBy(l.source)} that conflicts with "${note?.title}": ${l.conflictClaims?.said} vs ${l.conflictClaims?.noted}.${owner ? ` Asked ${owner.name}.` : ""}`, note?.id, l.id);
     }
   });
-  return reconfirmed;
+  return { reconfirmed, reconfirmedNotes };
 }
+
+const fromSource = (channel: LeafSource["channel"], ref: string) => (s: LeafSource) => s.channel === channel && s.ref === ref;
+const noteRef = (it: Item): ReconfirmedNote => ({ id: it.id, title: it.title, nodeId: it.nodeId, times: (it.reconfirmedBy?.length ?? 0) + 1 });
 
 /** Leaves that reconfirmed an existing leaf from this message, so re-ingesting it changes nothing. */
 export function leavesReconfirmedBy(channel: LeafSource["channel"], ref: string): Leaf[] {
-  return getDb().leaves.filter((l) => l.reconfirmedBy?.some((s) => s.channel === channel && s.ref === ref));
+  return getDb().leaves.filter((l) => l.reconfirmedBy?.some(fromSource(channel, ref)));
+}
+
+/** Notes this message said again, so re-ingesting it changes nothing. */
+export function notesReconfirmedBy(channel: LeafSource["channel"], ref: string): ReconfirmedNote[] {
+  return getDb().items.filter((i) => i.reconfirmedBy?.some(fromSource(channel, ref))).map(noteRef);
 }
 
 // ---------- the owner's card ----------
@@ -129,8 +154,11 @@ export const CONFLICT_CHOICES: readonly ConflictChoice[] = ["correct", "keep", "
  * - keep: the leaf falls.
  * - unsure: the conflict leaves the owner's cards and waits in the digest.
  * Answering a conflict that is already resolved changes nothing. Throws AccessDeniedError otherwise.
+ * `actor` is who actually tapped (the signed-in user "viewing as" the owner): versions and Changes record them,
+ * with "on behalf of <owner>" when that is not the owner.
  */
-export function resolveConflict(owner: Person, leafId: string, choice: ConflictChoice, now = new Date()): Leaf {
+export function resolveConflict(owner: Person, leafId: string, choice: ConflictChoice, opts: { actor?: Person; now?: Date } = {}): Leaf {
+  const actor = opts.actor ?? owner;
   const leaf = getDb().leaves.find((l) => l.id === leafId);
   if (!leaf) throw new AccessDeniedError();
   assertNodeAccess(owner, leaf.nodeId);
@@ -139,7 +167,8 @@ export function resolveConflict(owner: Person, leafId: string, choice: ConflictC
   if (leaf.status !== "conflict") return leaf;
   if (choice === "unsure" && leaf.deferredAt) return leaf;
 
-  const at = now.toISOString();
+  const at = (opts.now ?? new Date()).toISOString();
+  const behalf = actor.id === owner.id ? "" : ` on behalf of ${owner.name}`;
   let out = leaf;
   saveDb((db) => {
     const l = db.leaves.find((x) => x.id === leafId)!;
@@ -147,21 +176,21 @@ export function resolveConflict(owner: Person, leafId: string, choice: ConflictC
     const c = l.conflictClaims ?? { said: l.statement, noted: it.title };
     const who = saidBy(l.source);
     if (choice === "correct") {
-      const reason = `${who} said ${c.said} (${l.source.channel}, ${day(l.source.at)}): "${l.quote}"`;
+      const reason = `${who} said ${c.said} (${l.source.channel}, ${day(l.source.at)}): "${l.quote}"${behalf ? `. Corrected by ${actor.name}${behalf}` : ""}`;
       Object.assign(it, correctedNote(it, { statement: l.statement, channel: l.source.channel, saidBy: who }, c));
-      it.versions.push({ version: it.versions.length + 1, byId: owner.id, at, note: reason, source: { ...l.source, leafId: l.id } });
+      it.versions.push({ version: it.versions.length + 1, byId: actor.id, at, note: reason, source: { ...l.source, leafId: l.id } });
       it.updatedAt = at;
       it.verifiedById = owner.id;
       it.verifiedAt = at;
       l.status = "verified";
       l.verifiedById = owner.id;
-      log(db, "new_version", it.nodeId, owner.id, `corrected "${it.title}" to version ${it.versions.length}: ${who} said ${c.said} (${l.source.channel})`, it.id);
+      log(db, "new_version", it.nodeId, actor.id, `corrected "${it.title}" to version ${it.versions.length}${behalf}: ${who} said ${c.said} (${l.source.channel})`, it.id);
     } else if (choice === "keep") {
       l.status = "fallen";
-      log(db, "leaf_kept", it.nodeId, owner.id, `kept "${it.title}" (${c.noted}). The ${l.source.channel} leaf from ${who} (${c.said}) fell`, it.id);
+      log(db, "leaf_kept", it.nodeId, actor.id, `kept "${it.title}" (${c.noted})${behalf}. The ${l.source.channel} leaf from ${who} (${c.said}) fell`, it.id);
     } else {
       l.deferredAt = at;
-      log(db, "leaf_deferred", it.nodeId, owner.id, `was not sure about ${c.said} vs ${c.noted} for "${it.title}". It waits in the digest`, it.id);
+      log(db, "leaf_deferred", it.nodeId, actor.id, `was not sure about ${c.said} vs ${c.noted} for "${it.title}"${behalf}. It waits in the digest`, it.id);
     }
     out = structuredClone(l);
   });
@@ -192,10 +221,10 @@ function parseJudgement(json: string | undefined): Judgement {
 
 // ---------- helpers ----------
 
-function log(db: Db, action: ActivityAction, nodeId: string, actorId: string, summary: string, itemId?: string) {
+function log(db: Db, action: ActivityAction, nodeId: string, actorId: string, summary: string, itemId?: string, leafId?: string) {
   const n = db.nodes.find((x) => x.id === nodeId);
   if (!n) return;
-  db.activity.push({ id: uid("a"), at: new Date().toISOString(), actorId, action, companyId: n.companyId, nodeId, itemId, summary });
+  db.activity.push({ id: uid("a"), at: new Date().toISOString(), actorId, action, companyId: n.companyId, nodeId, itemId, ...(leafId ? { leafId } : {}), summary });
 }
 
 /** "Katrin Vogel <katrin@…>" → "Katrin Vogel"; without a sender, the person who captured it. */

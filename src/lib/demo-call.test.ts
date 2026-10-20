@@ -7,10 +7,13 @@ import { ingestDemoCall } from "./demo-call";
 import { ingestAudio } from "./audio-ingest";
 import { leavesForCompany } from "./leaves";
 import { seed } from "./seed";
-import { endDemoCall, ingestText, undoLeaves } from "./leaf-actions";
+import { conflictCards, endDemoCall, ingestText, undoLeaves } from "./leaf-actions";
+import { getDb } from "./db";
 import { AccessDeniedError } from "./access";
+import { ValidationError } from "./validation";
 import { DEMO_MAILS, mailIngestInput } from "./demo-mails";
 import type { ModelClient, ModelRequest } from "./gemini";
+import bundledCache from "./gemini-cache.json";
 
 // Vertex unreachable (it has been answering 429): every model call fails, so the committed cache answers. No network.
 delete process.env.GOOGLE_CLOUD_PROJECT;
@@ -78,6 +81,16 @@ describe("hanging up and undo (server actions)", () => {
     expect(caught().map((l) => l.id).sort()).toEqual(mail.leaves.map((l) => l.id).sort());
   });
 
+  it("undo also takes back what the leaves set off: the conflict in Changes and Jonas's card", async () => {
+    const activityBefore = getDb().activity.length;
+    const call = await endDemoCall();
+    expect(getDb().activity.filter((a) => a.action === "leaf_conflict")).toHaveLength(1);
+    expect(await conflictCards("jonas")).toHaveLength(1);
+    await undoLeaves(call.leaves.map((l) => l.id));
+    expect(getDb().activity).toHaveLength(activityBefore);
+    expect(await conflictCards("jonas")).toEqual([]);
+  });
+
   it("someone else can't undo Lena's leaves, not even with access to Nike", async () => {
     const call = await endDemoCall();
     const ids = call.leaves.map((l) => l.id);
@@ -89,8 +102,9 @@ describe("hanging up and undo (server actions)", () => {
   });
 
   it("rejects ids that are not a list of strings", async () => {
-    await expect(undoLeaves("l1" as never)).rejects.toThrow();
-    await expect(undoLeaves(["nope"])).rejects.toBeInstanceOf(AccessDeniedError);
+    await expect(undoLeaves("l1" as never)).rejects.toBeInstanceOf(ValidationError);
+    await expect(undoLeaves([1] as never)).rejects.toBeInstanceOf(ValidationError);
+    await expect(undoLeaves(["nope"])).rejects.toBeInstanceOf(AccessDeniedError); // well-formed but unknown
   });
 });
 
@@ -118,6 +132,22 @@ describe("ingestAudio (shared by the call and the voice note)", () => {
     expect(seen[0].parts).toContainEqual({ inlineData: unknownAudio });
     expect(res.leaves).toHaveLength(1);
     expect(res.leaves[0]).toMatchObject({ quote: "Jonas handled the Betriebsrat approval", nodeId: "nk-de-gmbh", source: { ref: "call:live" } });
+  });
+
+  it("never keeps a transcript: not in the runtime cache, not in the committed one", async () => {
+    const model: ModelClient = {
+      generate: async (req) => (req.parts.some((p) => "inlineData" in p) ? "Katrin: Jonas handled the Betriebsrat approval last year." : JSON.stringify({ leaves: [] })),
+    };
+    await ingestAudio(lena(), { ...input, ref: "call:private", fallbackTranscript: transcript }, { model });
+    const runtimeFile = path.join(process.env.KT_DATA_DIR!, "gemini-cache.json");
+    const runtime = fs.existsSync(runtimeFile) ? JSON.parse(fs.readFileSync(runtimeFile, "utf8")) : {};
+    expect(Object.keys(runtime).filter((k) => k.startsWith("transcript:"))).toEqual([]);
+    expect(JSON.stringify(runtime)).not.toContain("Betriebsrat approval last year");
+    expect(Object.keys(bundledCache).filter((k) => k.startsWith("transcript:"))).toEqual([]);
+  });
+
+  it("with Vertex down, the demo call is transcribed from the shipped script", async () => {
+    expect((await ingestDemoCall(lena(), { model: down })).transcriptFrom).toBe("fallback");
   });
 
   it("grows nothing when there is no transcript at all", async () => {

@@ -68,6 +68,7 @@ export type Item = {
   status: "active" | "superseded";
   supersededById?: string;
   confirmsId?: string; // this item corroborates another item
+  reconfirmedBy?: LeafSource[]; // calls/mails/messages that said the same as this note (COMPARE "same"), no leaf made
   source: { type: "portal" | "teams" | "outlook"; ref: string };
 };
 
@@ -94,6 +95,7 @@ export type Activity = {
   companyId: string;
   nodeId: string;
   itemId?: string;
+  leafId?: string; // the new leaf this entry is about (e.g. leaf_conflict), so undoing the leaf removes it too
   summary: string;
 };
 

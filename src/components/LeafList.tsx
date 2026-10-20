@@ -1,19 +1,11 @@
 import Link from "next/link";
 import { Mail, MessageSquare, Phone, Globe, Mic } from "lucide-react";
-import type { Channel, Leaf, LeafType } from "@/lib/types";
+import type { Channel, Leaf } from "@/lib/types";
 import { personName } from "./Avatar";
 import { fmtDate } from "@/lib/format";
 import type { FreshLeaf, Season } from "@/lib/freshness";
 import { UsefulButton } from "./UsefulButton";
-
-export const LEAF_TYPE_META: Record<LeafType, { label: string; icon: string; color: string }> = {
-  attention: { label: "Attention point", icon: "⚠️", color: "#b45309" },
-  change: { label: "Change", icon: "🔄", color: "#006dd8" },
-  decision: { label: "Decision", icon: "🧭", color: "#7c3aed" },
-  promise: { label: "Promise", icon: "🤝", color: "#0f766e" },
-  expertise: { label: "Expertise", icon: "👤", color: "#4b5563" },
-  risk: { label: "Customer risk", icon: "📉", color: "#dc2626" },
-};
+import { LeafStatusBadge, LeafTypeBadge, ReconfirmedLabel } from "./LeafBadges";
 
 const CHANNEL_META: Record<Channel, { label: string; Icon: typeof Mail }> = {
   mail: { label: "Mail", Icon: Mail },
@@ -31,22 +23,10 @@ export const SEASON_META: Record<Season, { label: string; color: string; border:
   fallen: { label: "Fallen", color: "#78716c", border: "border-stone-300" },
 };
 
-/** ×n: the same fact heard n times. Each reconfirmation is a deeper green. */
-function ReconfirmedLabel({ times, sources = [] }: { times: number; sources?: Leaf["source"][] }) {
-  const shade = times >= 4 ? "bg-emerald-800" : times === 3 ? "bg-emerald-700" : "bg-emerald-600";
-  const from = sources.map((x) => `${x.channel}${x.from ? ` from ${x.from.replace(/\s*<.*>$/, "")}` : ""}`).join(", ");
-  return <span className={`rounded-full px-1.5 py-0.5 text-[10.5px] font-bold text-white ${shade}`} title={`Heard ${times} times${from ? `, also via ${from}` : ""}`}>×{times}</span>;
-}
-
 /** Link back to the message a leaf came from, for channels whose mock can show it (Teams: `teams:<message id>`). */
 function sourceHref(leaf: Leaf) {
   const m = /^teams:([\w-]+)$/.exec(leaf.source.ref);
   return leaf.source.channel === "teams" && m ? `/teams#${m[1]}` : null;
-}
-
-export function LeafTypeBadge({ type }: { type: LeafType }) {
-  const m = LEAF_TYPE_META[type];
-  return <span className="inline-flex items-center gap-1 rounded-[4px] px-1.5 py-0.5 text-[10.5px] font-semibold" style={{ background: `${m.color}14`, color: m.color }}>{m.icon} {m.label}</span>;
 }
 
 /** One leaf: statement, why, the literal quote, where and when it was caught, who said it, and how sure we are. */
@@ -62,8 +42,7 @@ export function LeafCard({ leaf }: { leaf: Leaf | FreshLeaf }) {
     <div className={`fade-up rounded-[8px] border bg-white p-3 ${border} ${fresh?.season === "fallen" ? "opacity-70" : ""}`} style={s || conflict ? { borderLeftWidth: 4, borderLeftColor: conflict ? "#dc2626" : s!.color } : undefined}>
       <div className="flex flex-wrap items-center gap-1.5">
         <LeafTypeBadge type={leaf.type} />
-        {leaf.status === "seed" && <span className="text-[10.5px] font-medium text-amber-700">🌱 seed, waiting for a place</span>}
-        {conflict && <span className="text-[10.5px] font-semibold text-red-600" title="Contradicts a note; its owner was asked once">⚠️ conflicts with a note{leaf.deferredAt ? " · in the digest" : ", owner asked"}</span>}
+        <LeafStatusBadge leaf={leaf} />
         {leaf.status === "verified" && <span className="text-[10.5px] font-semibold text-emerald-700">✓ verified{leaf.verifiedById ? ` by ${personName(leaf.verifiedById)}` : ""}</span>}
         {times > 1 && <ReconfirmedLabel times={times} sources={leaf.reconfirmedBy} />}
         <span className="ml-auto text-[10.5px] font-semibold text-sd-muted" title="Confidence">{Math.round(leaf.confidence * 100)}%</span>

@@ -4,17 +4,25 @@ import { useState, useTransition, useRef, useEffect } from "react";
 import Link from "next/link";
 import { Bell, MessageCircle, Users, Calendar, Phone, MoreHorizontal, Search, Send, Bookmark, Smile, ChevronRight, ExternalLink, FileText, User, Clock } from "lucide-react";
 import { askBot, type BotAnswer } from "@/lib/actions";
-import { ingestText, type IngestedLeaf } from "@/lib/leaf-actions";
+import { ingestText, type Ingested } from "@/lib/leaf-actions";
 import { DEMO_TEAMS_MESSAGES, teamsReactionInput } from "@/lib/demo-teams";
 import { stripMarkdown } from "@/lib/text";
 import { ConflictCards } from "./ConflictCards";
+import { leafIcon, leavesLabel } from "./LeafBadges";
 
-/** What a 🍃 reaction on a message grew: still thinking, leaves on a node, nothing worth keeping, or a failure. */
-type Reaction = { state: "pending" } | { state: "kept"; leaves: IngestedLeaf[]; reconfirmed: number; companyId: string } | { state: "nothing" } | { state: "failed" };
+/**
+ * What a 🍃 reaction on a message grew: still thinking, leaves (or known leaves/notes) on a node, nothing worth keeping,
+ * or a failure. "kept" comes from the stored leaves on load; the others only live in this page.
+ */
+type Reaction = { state: "pending" } | { state: "kept"; caught: Ingested & { companyId: string } } | { state: "nothing" } | { state: "failed" };
 type Msg = { id: string; from: string; initials: string; color: string; at: string; text: string; bot?: BotAnswer; me?: boolean; leaf?: Reaction };
 
-export function TeamsMock() {
-  const [msgs, setMsgs] = useState<Msg[]>(DEMO_TEAMS_MESSAGES);
+const kept = (caught: Ingested): Reaction | null =>
+  caught.companyId && (caught.leaves.length || caught.reconfirmed.length || caught.reconfirmedNotes.length) ? { state: "kept", caught: { ...caught, companyId: caught.companyId } } : null;
+
+/** `reactions`: the stored 🍃 reactions per message id (from `teamsReactions()`). */
+export function TeamsMock({ reactions }: { reactions: Record<string, Ingested> }) {
+  const [msgs, setMsgs] = useState<Msg[]>(() => DEMO_TEAMS_MESSAGES.map((m) => ({ ...m, leaf: reactions[m.id] ? kept(reactions[m.id]) ?? undefined : undefined })));
   const [hover, setHover] = useState<string | null>(null);
   const [linked, setLinked] = useState<string | null>(null);
   const [draft, setDraft] = useState("@KnowledgeTree what is the payroll cutoff for Nike Germany?");
@@ -41,10 +49,7 @@ export function TeamsMock() {
     if (m.leaf && m.leaf.state !== "failed") return;
     setReaction(m.id, { state: "pending" });
     ingestText(teamsReactionInput(m))
-      .then((r) => {
-        const all = [...r.leaves, ...r.reconfirmed]; // a reconfirmation makes no new leaf, it strengthens a known one (×n)
-        setReaction(m.id, all.length && r.companyId ? { state: "kept", leaves: all, reconfirmed: r.reconfirmed.length, companyId: r.companyId } : { state: "nothing" });
-      })
+      .then((r) => setReaction(m.id, kept(r) ?? { state: "nothing" })) // a reconfirmation makes no new leaf, it strengthens a known one (×n)
       .catch(() => setReaction(m.id, { state: "failed" }));
   };
 
@@ -132,16 +137,26 @@ function LeafReaction({ r }: { r: Reaction }) {
   if (r.state === "pending") return <div className="mt-2 flex items-center gap-2 text-[11.5px] text-[#616161]">{pill} Reading the message…</div>;
   if (r.state === "nothing") return <div className="mt-2 flex items-center gap-2 text-[11.5px] text-[#616161]">{pill} Nothing to keep in this message.</div>;
   if (r.state === "failed") return <div className="mt-2 flex items-center gap-2 text-[11.5px] text-rose-700">{pill} Could not reach KnowledgeTree. React again to retry.</div>;
-  const [first] = r.leaves;
-  const seed = r.leaves.every((l) => l.status === "seed");
+  const { leaves: fresh, reconfirmed, reconfirmedNotes, companyId } = r.caught;
+  const leaves = [...fresh, ...reconfirmed];
+  const [first] = leaves;
+  const seed = leafIcon(leaves) === "🌱";
   return (
     <div className="mt-2 space-y-1.5">
       {pill}
-      <Link href={`/customers/${r.companyId}?node=${first.nodeId}`} className="fade-up flex items-center gap-1.5 rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11.5px] font-medium text-emerald-800">
-        <span>{seed ? "🌱" : "🍃"} {r.reconfirmed === r.leaves.length ? `known leaf ×${first.reconfirmedAt.length + 1}` : `${r.leaves.length} ${r.leaves.length === 1 ? "leaf" : "leaves"}${r.reconfirmed ? `, ${r.reconfirmed} reconfirmed` : ""}`} {seed ? "waiting at" : "on"}</span>
-        <span className="flex flex-wrap items-center gap-1 text-sd-text">{first.path.map((p, i) => <span key={i} className="flex items-center gap-1">{i > 0 && <ChevronRight className="h-3 w-3" />}{p}</span>)}</span>
-        <ExternalLink className="ml-auto h-3 w-3" />
-      </Link>
+      {first && (
+        <Link href={`/customers/${companyId}?node=${first.nodeId}`} className="fade-up flex items-center gap-1.5 rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11.5px] font-medium text-emerald-800">
+          <span>{leafIcon(leaves)} {!fresh.length ? `known leaf ×${first.reconfirmedAt.length + 1}` : `${leavesLabel(fresh.length)}${reconfirmed.length ? `, ${reconfirmed.length} reconfirmed` : ""}`} {seed ? "waiting at" : "on"}</span>
+          <span className="flex flex-wrap items-center gap-1 text-sd-text">{first.path.map((p, i) => <span key={i} className="flex items-center gap-1">{i > 0 && <ChevronRight className="h-3 w-3" />}{p}</span>)}</span>
+          <ExternalLink className="ml-auto h-3 w-3" />
+        </Link>
+      )}
+      {reconfirmedNotes.map((n) => (
+        <Link key={n.id} href={`/customers/${companyId}?node=${n.nodeId}&item=${n.id}`} className="fade-up flex items-center gap-1.5 rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11.5px] font-medium text-emerald-800">
+          <span>Confirms the note “{n.title}” ×{n.times}</span>
+          <ExternalLink className="ml-auto h-3 w-3" />
+        </Link>
+      ))}
     </div>
   );
 }

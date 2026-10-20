@@ -141,6 +141,32 @@ describe("reconfirmation", () => {
     expect(leavesForNode("nk-de-gmbh")[0].reconfirmedAt).toHaveLength(1);
   });
 
+  describe("saying the same as a note", () => {
+    const MAIL15 = "Hi Lena, just to confirm: the payroll cutoff for Nike Deutschland GmbH stays the 15th. Katrin";
+    const mail15 = { ...call20, type: "attention", statement: "The payroll cutoff for Nike Deutschland GmbH stays the 15th.", quote: "the payroll cutoff for Nike Deutschland GmbH stays the 15th" };
+    const input15 = { ...mailInput, text: MAIL15, ref: "outlook:e15" };
+    const sameAsNote = (text: string): Judgement => (/NOTE "Payroll cutoff Germany: the 15th/.test(text) ? { relation: "same" } : { relation: "unrelated" });
+    const note = () => getDb().items.find((i) => i.id === "i-nk-de-cutoff-new")!;
+
+    it("reconfirms the note: no new leaf, the note records who said it again, and Changes shows it", async () => {
+      const res = await ingest(lena(), input15, { model: fakeModel([mail15], sameAsNote).client });
+      expect(res.leaves).toEqual([]);
+      expect(res.reconfirmedNotes).toMatchObject([{ id: "i-nk-de-cutoff-new" }]);
+      expect(leavesForNode("nk-de-gmbh")).toEqual([]);
+      expect(note().reconfirmedBy).toMatchObject([{ channel: "mail", ref: "outlook:e15", byId: "lena" }]);
+      expect(getDb().activity.at(-1)).toMatchObject({ action: "leaf_reconfirmed", itemId: "i-nk-de-cutoff-new", actorId: "lena" });
+    });
+
+    it("re-opening the mail does not count it twice", async () => {
+      await ingest(lena(), input15, { model: fakeModel([mail15], sameAsNote).client });
+      const again = fakeModel([mail15], sameAsNote);
+      const res = await ingest(lena(), input15, { model: again.client });
+      expect(again.calls).toEqual([]);
+      expect(res.reconfirmedNotes).toMatchObject([{ id: "i-nk-de-cutoff-new" }]);
+      expect(note().reconfirmedBy).toHaveLength(1);
+    });
+  });
+
   it("an unusable comparison answer counts as a new leaf", async () => {
     const garbage: ModelClient = { generate: async (req) => (JSON.stringify(req.schema).includes('"relation"') ? "not json" : JSON.stringify({ leaves: [call20] })) };
     const { leaves } = await ingest(lena(), callInput, { model: garbage });

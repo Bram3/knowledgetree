@@ -1,10 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { dataDir, uid } from "./db";
-
 import { ALLOWED_TYPES, MAX_UPLOAD_BYTES } from "./upload-rules";
-
-export { ALLOWED_TYPES, MAX_UPLOAD_BYTES };
 
 const PREVIEWABLE = new Set(["pdf", "png", "jpg", "jpeg", "gif"]);
 

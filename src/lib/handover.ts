@@ -2,7 +2,7 @@ import { companyNodes, getDb, node, person, saveDb, uid } from "./db";
 import { isLive } from "./leaves";
 import { isCurrent } from "./freshness";
 import { AccessDeniedError, assertCompanyAccess } from "./access";
-import type { Handover, Leaf, OrgNode, Person } from "./types";
+import type { Handover, Item, Leaf, OrgNode, Person } from "./types";
 
 /**
  * Scene 5 (herfst): knowledge risk, role change, successor and handover.
@@ -23,12 +23,32 @@ function subtree(nodeId: string): Set<string> {
   return out;
 }
 
-/** Who each piece of knowledge on these nodes comes from: current leaves (who caught it) and active notes (who wrote it). */
-function contributors(nodeIds: Set<string>, now: Date): string[] {
+// ---------- contributors ----------
+
+/**
+ * Who a piece of knowledge comes from: whoever caught the leaf or wrote the note (or document), or whoever it
+ * was handed over to since. This one notion drives both the knowledge risk and what a leaver holds.
+ */
+export function contributorOf(x: Leaf | Item): string {
+  if ("statement" in x) return leafOwnerId(x);
+  return getDb().handovers.findLast((h) => h.itemIds.includes(x.id))?.toId ?? x.createdById;
+}
+
+/** It comes only from `personId`: they contributed it and nobody else has said it again (reconfirmed it) since. */
+export function onlyFrom(x: Leaf | Item, personId: string): boolean {
+  return contributorOf(x) === personId && (x.reconfirmedBy ?? []).every((s) => s.byId === personId);
+}
+
+/** The single person each piece of knowledge on these nodes comes from (null when others reconfirmed it). */
+function soleContributors(nodeIds: Set<string>, now: Date): (string | null)[] {
   const db = getDb();
+  const sole = (x: Leaf | Item) => {
+    const id = contributorOf(x);
+    return onlyFrom(x, id) ? id : null;
+  };
   return [
-    ...db.leaves.filter((l) => nodeIds.has(l.nodeId) && isCurrent(l, now)).map((l) => l.source.byId),
-    ...db.items.filter((i) => nodeIds.has(i.nodeId) && i.kind === "note" && i.status === "active").map((i) => i.createdById),
+    ...db.leaves.filter((l) => nodeIds.has(l.nodeId) && isCurrent(l, now)).map(sole),
+    ...db.items.filter((i) => nodeIds.has(i.nodeId) && i.kind === "note" && i.status === "active").map(sole),
   ];
 }
 
@@ -41,13 +61,16 @@ export type KnowledgeRisk = {
   percent: number; // rounded share, 0..100
 };
 
-/** Share of the current leaves and notes on `nodeId` (and below) from its biggest contributor. Faded leaves don't count. */
+/**
+ * Share of the current leaves and notes on `nodeId` (and below) that come only from its biggest contributor
+ * (see `onlyFrom`). Faded leaves don't count.
+ */
 export function knowledgeRisk(nodeId: string, now: Date): KnowledgeRisk | null {
   const n = node(nodeId);
-  const from = contributors(subtree(nodeId), now);
-  if (!n || !from.length) return null;
+  const from = soleContributors(subtree(nodeId), now);
   const counts = new Map<string, number>();
-  for (const id of from) counts.set(id, (counts.get(id) ?? 0) + 1);
+  for (const id of from) if (id) counts.set(id, (counts.get(id) ?? 0) + 1);
+  if (!n || !counts.size) return null;
   const [personId, count] = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
   return { nodeId, nodeName: n.name, personId, count, total: from.length, percent: Math.round((count / from.length) * 100) };
 }
@@ -91,18 +114,18 @@ export function markRoleChange(actor: Person, personId: string, companyId: strin
 
 export type Holdings = { personId: string; leafIds: string[]; itemIds: string[] };
 
-/** Live leaves and active items of one customer owned by `personId`. */
+/** Live leaves and active items (notes and documents) of one customer that come only from `personId` (see `onlyFrom`). */
 export function holdings(personId: string, companyId: string): Holdings {
   const ids = new Set(companyNodes(companyId).map((n) => n.id));
   const db = getDb();
   return {
     personId,
-    leafIds: db.leaves.filter((l) => ids.has(l.nodeId) && isLive(l) && leafOwnerId(l) === personId).map((l) => l.id),
-    itemIds: db.items.filter((i) => ids.has(i.nodeId) && i.status === "active" && i.ownerId === personId).map((i) => i.id),
+    leafIds: db.leaves.filter((l) => ids.has(l.nodeId) && isLive(l) && onlyFrom(l, personId)).map((l) => l.id),
+    itemIds: db.items.filter((i) => ids.has(i.nodeId) && i.status === "active" && onlyFrom(i, personId)).map((i) => i.id),
   };
 }
 
-/** Knowledge of a customer that only people who left still own: "34 leaves come only from Jonas. Who takes over?" */
+/** Knowledge of a customer that comes only from people who left: "34 leaves come only from Jonas. Who takes over?" */
 export function orphanedKnowledge(companyId: string): Holdings[] {
   return getDb().people
     .filter((p) => p.leftAt)
@@ -227,8 +250,9 @@ export function handoverBrief(user: Person, handoverId: string, now: Date): Hand
   const c = assertCompanyAccess(user, h.companyId);
   const db = getDb();
   const leafIds = new Set(h.leafIds);
+  const itemIds = new Set(h.itemIds);
   const leaves = db.leaves.filter((l) => leafIds.has(l.id) && isCurrent(l, now)); // faded leaves aren't current facts
-  const items = db.items.filter((i) => h.itemIds.includes(i.id) && i.status === "active");
+  const items = db.items.filter((i) => itemIds.has(i.id) && i.status === "active");
   const base = `/customers/${c.id}`;
 
   const facts: BriefPoint[] = [
@@ -237,10 +261,11 @@ export function handoverBrief(user: Person, handoverId: string, now: Date): Hand
   ];
   const attention = leaves.filter((l) => l.status !== "conflict" && (l.type === "attention" || l.type === "risk")).map((l) => ({ text: l.statement, source: leafSource(l, c.id) }));
 
-  const conflicting = db.leaves.filter((l) => l.status === "conflict" && isLive(l) && (leafIds.has(l.id) || (l.conflictsWith && leafIds.has(l.conflictsWith))));
+  // A conflict is a leaf that contradicts a note (`conflictsWith` is the note's id).
+  const conflicting = db.leaves.filter((l) => l.status === "conflict" && isLive(l) && (leafIds.has(l.id) || (l.conflictsWith && itemIds.has(l.conflictsWith))));
   const conflicts = conflicting.map((l) => {
-    const other = l.conflictsWith ? db.leaves.find((x) => x.id === l.conflictsWith) : undefined;
-    return { text: other ? `${l.statement} Conflicts with: ${other.statement}` : l.statement, source: leafSource(l, c.id) };
+    const note = l.conflictsWith ? db.items.find((i) => i.id === l.conflictsWith) : undefined;
+    return { text: note ? `${l.statement} Conflicts with the note: ${note.title}` : l.statement, source: leafSource(l, c.id) };
   });
 
   // People to call: the previous owner, the customer contacts on the branches involved, people named in the leaves.

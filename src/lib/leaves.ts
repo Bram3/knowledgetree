@@ -32,12 +32,16 @@ export function addLeaves(leaves: Leaf[]) {
   saveDb((db) => void db.leaves.push(...leaves));
 }
 
-/** Delete leaves outright (undo right after capture). Unknown ids are ignored. */
+/**
+ * Delete leaves outright (undo right after capture), with the Changes entries they set off (e.g. a conflict).
+ * A conflict card is derived from its leaf, so it goes too. Unknown ids are ignored.
+ */
 export function removeLeaves(ids: string[]) {
   const drop = new Set(ids);
   if (!drop.size) return;
   saveDb((db) => {
     db.leaves = db.leaves.filter((l) => !drop.has(l.id));
+    db.activity = db.activity.filter((a) => !a.leafId || !drop.has(a.leafId));
   });
 }
 

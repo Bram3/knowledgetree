@@ -30,13 +30,13 @@ let ephemeral: string | undefined;
 
 /**
  * The cookie-signing secret. Reads `SESSION_SECRET` from the environment.
- * Outside production a fixed dev-only fallback is used; in production without a
+ * Only in development and tests a fixed dev-only fallback is used; anywhere else without a
  * secret a random per-process secret is used (sessions reset on restart).
  */
 export function sessionSecret(): string {
   const env = process.env.SESSION_SECRET;
   if (env) return env;
-  if (process.env.NODE_ENV !== "production") return DEV_SECRET;
+  if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") return DEV_SECRET;
   if (!ephemeral) {
     ephemeral = randomBytes(32).toString("hex");
     console.warn("SESSION_SECRET is not set: using a random per-process secret. Sessions will not survive a restart.");

@@ -96,11 +96,21 @@ describe("one tap", () => {
     expect(getDb().activity.at(-1)).toMatchObject({ action: "leaf_deferred", actorId: "jonas" });
   });
 
-  it("Lena viewing as Jonas answers as Jonas", async () => {
+  it("Lena viewing as Jonas answers his card, but the record shows it was Lena, on his behalf", async () => {
     const leaf = await callWithKatrin();
     await signInAs("lena");
     await answerConflict(leaf.id, "correct", "jonas");
-    expect(note().versions[2].byId).toBe("jonas");
+    expect(note().versions[2]).toMatchObject({ byId: "lena", note: expect.stringContaining("on behalf of Jonas Becker") });
+    expect(getDb().activity.at(-1)).toMatchObject({ action: "new_version", actorId: "lena", summary: expect.stringContaining("on behalf of Jonas Becker") });
+  });
+
+  it("the same for Keep mine and Not sure", async () => {
+    const leaf = await callWithKatrin();
+    await signInAs("lena");
+    await answerConflict(leaf.id, "unsure", "jonas");
+    expect(getDb().activity.at(-1)).toMatchObject({ action: "leaf_deferred", actorId: "lena", summary: expect.stringContaining("on behalf of Jonas Becker") });
+    await answerConflict(leaf.id, "keep", "jonas");
+    expect(getDb().activity.at(-1)).toMatchObject({ action: "leaf_kept", actorId: "lena", summary: expect.stringContaining("on behalf of Jonas Becker") });
   });
 
   it("only the note's owner can answer; a second tap changes nothing", async () => {

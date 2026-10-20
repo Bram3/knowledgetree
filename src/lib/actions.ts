@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDb, saveDb, resetDb, uid, detectNode, detectTopic, search, person, nodePath, company, categoryForTopic } from "./db";
@@ -9,6 +8,8 @@ import { requireCustomerAccess, requireItemAccess, requireCompanyAccess, AccessD
 import type { Item, ActivityAction, Person } from "./types";
 import { storeUpload } from "./uploads";
 import { assertLinkableFile } from "./files";
+import { idString, ValidationError } from "./validation";
+import { revalidateAll } from "./revalidate";
 
 async function actor() {
   const u = await getCurrentUser();
@@ -19,10 +20,6 @@ async function actor() {
 function log(db: ReturnType<typeof getDb>, action: ActivityAction, nodeId: string, summary: string, actorId: string, itemId?: string) {
   const n = db.nodes.find((x) => x.id === nodeId)!;
   db.activity.push({ id: uid("a"), at: new Date().toISOString(), actorId, action, companyId: n.companyId, nodeId, itemId, summary });
-}
-
-function revalidateAll() {
-  revalidatePath("/", "layout");
 }
 
 // ---------- auth ----------
@@ -87,15 +84,33 @@ function createFileItem(u: Person, input: FileInput) {
   return id;
 }
 
+const MAX_FORM_FIELD = 200;
+const MAX_FORM_CONTENT = 20_000;
+
+/** Checks the upload form (it can be POSTed directly) and returns it typed, like validateIngestInput. Throws ValidationError. */
+function parseUploadForm(fd: FormData): { input: FileInput; file: File | null } {
+  const text = (name: string, max = MAX_FORM_FIELD) => {
+    const v = fd.get(name) ?? "";
+    if (typeof v !== "string" || v.length > max) throw new ValidationError(`Bad ${name}`);
+    return v.trim();
+  };
+  const nodeId = idString(fd.get("nodeId"), "node id");
+  const origin = text("origin") || "sdworx";
+  if (origin !== "sdworx" && origin !== "customer") throw new ValidationError("Bad origin");
+  const raw = fd.get("file");
+  if (raw !== null && typeof raw === "string") throw new ValidationError("Bad file");
+  const file = raw && raw.size > 0 ? raw : null;
+  const fileName = file?.name ?? (text("fileName") || "document.pdf");
+  const scope = (text("scope") || "all").split(",").map((s) => s.trim()).filter(Boolean);
+  return { file, input: { nodeId, title: text("title") || fileName, fileName, content: text("content", MAX_FORM_CONTENT), topic: text("topic"), category: text("category"), origin, scope } };
+}
+
 /** Real upload: validates and stores the file under data/uploads and creates the item. Called with a FormData from the upload form. */
 export async function uploadFile(fd: FormData) {
-  const nodeId = String(fd.get("nodeId"));
-  const { user } = await requireCustomerAccess(nodeId);
-  const file = fd.get("file") as File | null;
-  let stored: Awaited<ReturnType<typeof storeUpload>> = { fileName: String(fd.get("fileName") || "document.pdf"), fileUrl: "", fileSize: "—" };
-  if (file && file.size > 0) stored = await storeUpload(file);
-  const scope = String(fd.get("scope") || "all").split(",").map((s) => s.trim()).filter(Boolean);
-  return createFileItem(user, { nodeId, title: String(fd.get("title") || stored.fileName), fileName: stored.fileName, fileSize: stored.fileSize, fileUrl: stored.fileUrl || undefined, previewUrl: stored.previewUrl, content: String(fd.get("content") || ""), topic: String(fd.get("topic") || ""), category: String(fd.get("category") || ""), origin: (String(fd.get("origin") || "sdworx") as Item["origin"]), scope });
+  const { input, file } = parseUploadForm(fd);
+  const { user } = await requireCustomerAccess(input.nodeId);
+  const stored = file ? await storeUpload(file) : null;
+  return createFileItem(user, stored ? { ...input, ...stored } : input);
 }
 
 /** Upload a new version of an existing document. */

@@ -2,6 +2,7 @@ import { Redirect, signInAs, signOut } from "@/test/next-mocks";
 import { beforeEach, describe, expect, it } from "vitest";
 import { handOverKnowledge, markRoleChanged } from "./handover-actions";
 import { AccessDeniedError } from "./access";
+import { ValidationError } from "./validation";
 import { resetDb } from "./db";
 import { getHandover, orphanedKnowledge } from "./handover";
 
@@ -36,7 +37,8 @@ describe("handover server actions", () => {
 
   it("rejects malformed input sent straight to the action", async () => {
     await signInAs("marta");
-    await expect(handOverKnowledge({ companyId: "nike", fromId: 1, toId: "lena" } as never)).rejects.toBeInstanceOf(AccessDeniedError);
-    await expect(markRoleChanged({} as never, "nike")).rejects.toBeInstanceOf(AccessDeniedError);
+    await expect(handOverKnowledge({ companyId: "nike", fromId: 1, toId: "lena" } as never)).rejects.toBeInstanceOf(ValidationError);
+    await expect(handOverKnowledge(null as never)).rejects.toBeInstanceOf(ValidationError);
+    await expect(markRoleChanged({} as never, "nike")).rejects.toBeInstanceOf(ValidationError);
   });
 });
