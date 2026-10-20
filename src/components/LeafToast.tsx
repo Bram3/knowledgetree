@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { ChevronRight, X } from "lucide-react";
 import { undoLeaves, type IngestedLeaf } from "@/lib/leaf-actions";
+import { leafIcon, leavesLabel } from "./LeafBadges";
 
 /**
  * The calm "🍃 n leaves caught" toast with undo, for channels that capture without a click (call, voice note).
@@ -32,7 +33,6 @@ export function LeafToast({ caught, onClose, onUndone, autoHideMs = 12000 }: { c
   if (!caught) return null;
   const n = caught.leaves.length;
   const first = caught.leaves[0];
-  const seeds = n > 0 && caught.leaves.every((l) => l.status === "seed");
   const undo = () => start(async () => {
     try {
       await undoLeaves(caught.leaves.map((l) => l.id));
@@ -53,7 +53,7 @@ export function LeafToast({ caught, onClose, onUndone, autoHideMs = 12000 }: { c
             <div className="font-medium text-sd-text">Nothing to keep in this one.</div>
           ) : (
             <>
-              <div className="font-medium text-sd-text">{seeds ? "🌱" : "🍃"} {n} {n === 1 ? "leaf" : "leaves"} caught</div>
+              <div className="font-medium text-sd-text">{leafIcon(caught.leaves)} {leavesLabel(n)} caught</div>
               {first && caught.companyId && (
                 <Link href={`/customers/${caught.companyId}?node=${first.nodeId}&cat=${first.category}`} className="mt-0.5 flex flex-wrap items-center gap-1 text-[11.5px] text-emerald-800 hover:underline">
                   {first.path.map((p, i) => <span key={i} className="flex items-center gap-1">{i > 0 && <ChevronRight className="h-3 w-3" />}{p}</span>)}

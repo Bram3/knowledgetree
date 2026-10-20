@@ -8,6 +8,7 @@ import { ingestText, type Ingested } from "@/lib/leaf-actions";
 import { DEMO_TEAMS_MESSAGES, teamsReactionInput } from "@/lib/demo-teams";
 import { stripMarkdown } from "@/lib/text";
 import { ConflictCards } from "./ConflictCards";
+import { leafIcon, leavesLabel } from "./LeafBadges";
 
 /**
  * What a 🍃 reaction on a message grew: still thinking, leaves (or known leaves/notes) on a node, nothing worth keeping,
@@ -139,13 +140,13 @@ function LeafReaction({ r }: { r: Reaction }) {
   const { leaves: fresh, reconfirmed, reconfirmedNotes, companyId } = r.caught;
   const leaves = [...fresh, ...reconfirmed];
   const [first] = leaves;
-  const seed = leaves.length > 0 && leaves.every((l) => l.status === "seed");
+  const seed = leafIcon(leaves) === "🌱";
   return (
     <div className="mt-2 space-y-1.5">
       {pill}
       {first && (
         <Link href={`/customers/${companyId}?node=${first.nodeId}`} className="fade-up flex items-center gap-1.5 rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11.5px] font-medium text-emerald-800">
-          <span>{seed ? "🌱" : "🍃"} {!fresh.length ? `known leaf ×${first.reconfirmedAt.length + 1}` : `${fresh.length} ${fresh.length === 1 ? "leaf" : "leaves"}${reconfirmed.length ? `, ${reconfirmed.length} reconfirmed` : ""}`} {seed ? "waiting at" : "on"}</span>
+          <span>{leafIcon(leaves)} {!fresh.length ? `known leaf ×${first.reconfirmedAt.length + 1}` : `${leavesLabel(fresh.length)}${reconfirmed.length ? `, ${reconfirmed.length} reconfirmed` : ""}`} {seed ? "waiting at" : "on"}</span>
           <span className="flex flex-wrap items-center gap-1 text-sd-text">{first.path.map((p, i) => <span key={i} className="flex items-center gap-1">{i > 0 && <ChevronRight className="h-3 w-3" />}{p}</span>)}</span>
           <ExternalLink className="ml-auto h-3 w-3" />
         </Link>

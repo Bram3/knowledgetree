@@ -6,7 +6,7 @@ import { Mail, Inbox, Send, FileText, Archive, Trash2, Search, Reply, Forward, M
 import { suggestNode, nodeSummary, addFile } from "@/lib/actions";
 import { ingestText, type Ingested } from "@/lib/leaf-actions";
 import { DEMO_MAILS, mailIngestInput, type DemoMail } from "@/lib/demo-mails";
-import { LeafTypeBadge } from "./LeafList";
+import { LeafStatusBadge, LeafTypeBadge, ReconfirmedLabel, leavesLabel } from "./LeafBadges";
 
 const mails = DEMO_MAILS;
 
@@ -106,17 +106,16 @@ function AddInPane({ sel }: { sel: DemoMail }) {
             ) : (
               <div className="fade-up mt-1.5 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-[12px] text-emerald-900">
                 <div className="flex items-center gap-1.5 font-semibold">
-                  {caught.leaves.length > 0 && <span>🍃 {caught.leaves.length} lea{caught.leaves.length === 1 ? "f" : "ves"} caught</span>}
-                  {caught.reconfirmed.length > 0 && <span>{caught.leaves.length > 0 ? "· " : ""}{caught.reconfirmed.length} known lea{caught.reconfirmed.length === 1 ? "f" : "ves"} reconfirmed</span>}
+                  {caught.leaves.length > 0 && <span>🍃 {leavesLabel(caught.leaves.length)} caught</span>}
+                  {caught.reconfirmed.length > 0 && <span>{caught.leaves.length > 0 ? "· " : ""}{leavesLabel(caught.reconfirmed.length, "known")} reconfirmed</span>}
                 </div>
                 <ul className="mt-2 space-y-2">
                   {[...caught.leaves, ...caught.reconfirmed].map((l) => (
                     <li key={l.id} className={`rounded-md bg-white p-2 ring-1 ${l.status === "conflict" ? "ring-red-200" : "ring-emerald-100"}`}>
                       <div className="flex items-center gap-1.5">
                         <LeafTypeBadge type={l.type} />
-                        {l.status === "seed" && <span className="text-[10.5px] font-medium text-amber-700">🌱 seed: place unsure</span>}
-                        {l.status === "conflict" && <span className="text-[10.5px] font-semibold text-red-600">⚠️ conflicts with a note, owner asked</span>}
-                        {l.reconfirmedAt.length > 0 && <span className="rounded-full bg-emerald-600 px-1.5 text-[10.5px] font-bold text-white">×{l.reconfirmedAt.length + 1}</span>}
+                        <LeafStatusBadge leaf={l} />
+                        {l.reconfirmedAt.length > 0 && <ReconfirmedLabel times={l.reconfirmedAt.length + 1} sources={l.reconfirmedBy} />}
                       </div>
                       <div className="mt-1 text-[12px] leading-snug text-sd-text">{l.statement}</div>
                       <div className="mt-1 text-[11px] text-slate-500">{l.path.join(" › ")} · {Math.round(l.confidence * 100)}%</div>
@@ -124,7 +123,7 @@ function AddInPane({ sel }: { sel: DemoMail }) {
                   ))}
                   {caught.reconfirmedNotes.map((n) => (
                     <li key={n.id} className="rounded-md bg-white p-2 ring-1 ring-emerald-100">
-                      <div className="text-[12px] leading-snug text-sd-text">Confirms the note “{n.title}” <span className="rounded-full bg-emerald-600 px-1.5 text-[10.5px] font-bold text-white">×{n.times}</span></div>
+                      <div className="text-[12px] leading-snug text-sd-text">Confirms the note “{n.title}” <ReconfirmedLabel times={n.times} /></div>
                     </li>
                   ))}
                 </ul>
