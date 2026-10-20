@@ -1,5 +1,6 @@
 import { getDb, saveDb, companyNodes } from "./db";
 import type { Channel, Leaf } from "./types";
+import { isArchived, isCurrent, season, type Season } from "./freshness";
 
 /**
  * Leaf store. Leaves live next to items in the JSON store (`db.leaves`).
@@ -48,18 +49,48 @@ export function isLive(l: Leaf) {
   return l.status !== "fallen" && l.status !== "promoted";
 }
 
-export type LeafCount = { total: number; seeds: number; byCategory: Record<string, number> };
+/** Leaves on the tree at `now` (seeds included): not promoted, not fallen, not faded below the threshold. */
+export function currentLeaves(nodeId: string, now: Date): Leaf[] {
+  return leavesForNode(nodeId).filter((l) => isCurrent(l, now));
+}
 
-/** Live leaf counts per node of a customer, for the tree indicators. Seeds are counted apart from categories. */
-export function leafCounts(companyId: string): Record<string, LeafCount> {
+/** Fallen leaves of a node at `now`: still viewable, never deleted. Moving the date back brings them back. */
+export function archivedLeaves(nodeId: string, now: Date): Leaf[] {
+  return leavesForNode(nodeId).filter((l) => isArchived(l, now));
+}
+
+export type SeasonCount = Record<Exclude<Season, "fallen">, number>;
+export type LeafCount = {
+  total: number; // current leaves, seeds included
+  seeds: number;
+  fallen: number; // in the archive
+  byCategory: Record<string, number>; // current, placed leaves
+  seasons: SeasonCount; // placed leaves by colour
+  categorySeasons: Record<string, SeasonCount>;
+};
+
+const noSeasons = (): SeasonCount => ({ green: 0, yellow: 0, brown: 0 });
+
+/** Leaf counts per node of a customer at `now`, for the tree indicators. Seeds are counted apart from categories. */
+export function leafCounts(companyId: string, now: Date): Record<string, LeafCount> {
   const out: Record<string, LeafCount> = {};
-  for (const n of companyNodes(companyId)) out[n.id] = { total: 0, seeds: 0, byCategory: {} };
+  for (const n of companyNodes(companyId)) out[n.id] = { total: 0, seeds: 0, fallen: 0, byCategory: {}, seasons: noSeasons(), categorySeasons: {} };
   for (const l of getDb().leaves) {
     const c = out[l.nodeId];
-    if (!c || !isLive(l)) continue;
+    if (!c || l.status === "promoted") continue;
+    const s = season(l, now);
+    if (s === "fallen") {
+      c.fallen++;
+      continue;
+    }
     c.total++;
-    if (l.status === "seed") c.seeds++;
-    else c.byCategory[l.category] = (c.byCategory[l.category] ?? 0) + 1;
+    if (l.status === "seed") {
+      c.seeds++;
+      continue;
+    }
+    c.byCategory[l.category] = (c.byCategory[l.category] ?? 0) + 1;
+    c.seasons[s]++;
+    (c.categorySeasons[l.category] ??= noSeasons())[s]++;
   }
   return out;
 }

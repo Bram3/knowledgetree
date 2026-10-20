@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { ChevronRight, UserPlus, Upload, Plus, StickyNote, Paperclip, History, Users, BookOpen, ArrowDownToLine, Phone, MessageSquare, Pencil, Archive, Building2, ArrowDownLeft, Download, Leaf as LeafIcon } from "lucide-react";
-import type { Item, Leaf, OrgNode, Person } from "@/lib/types";
+import type { Item, OrgNode, Person } from "@/lib/types";
+import type { FreshLeaf } from "@/lib/freshness";
 import { LeafCard } from "./LeafList";
 import type { Product } from "@/lib/catalog";
 import { OTHER_CATEGORY } from "@/lib/catalog";
@@ -30,7 +31,8 @@ export type PanelData = {
   highlightItem?: string;
   currentUserId: string;
   initialCategory?: string;
-  leaves: Leaf[]; // live leaves on this node (seeds included at the customer root)
+  leaves: FreshLeaf[]; // current leaves on this node at the (simulated) date, seeds included at the customer root
+  fallenLeaves: FreshLeaf[]; // archive: faded below 0.3 or marked fallen, still viewable
 };
 
 export function NodePanel({ data }: { data: PanelData }) {
@@ -46,6 +48,7 @@ export function NodePanel({ data }: { data: PanelData }) {
   const theirs = visible.filter((i) => i.origin === "customer");
   const visibleInherited = cat === "all" ? data.inherited : data.inherited.filter((i) => i.category === cat);
   const visibleLeaves = cat === "all" ? data.leaves : data.leaves.filter((l) => l.category === cat || l.status === "seed");
+  const visibleFallen = cat === "all" ? data.fallenLeaves : data.fallenLeaves.filter((l) => l.category === cat || l.status === "seed");
   const defaultCategory = cat === "all" ? data.categories[0]?.id : cat;
 
   return (
@@ -105,6 +108,12 @@ export function NodePanel({ data }: { data: PanelData }) {
               {theirs.map((i) => <ItemCard key={i.id} item={i} highlight={data.highlightItem === i.id} me={data.currentUserId} categories={data.categories} />)}
             </Section>
 
+            {visibleFallen.length > 0 && (
+              <details className="group">
+                <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.1em] text-sd-muted">🍂 Fallen leaves, archive ({visibleFallen.length})</summary>
+                <div className="mt-2 space-y-2">{visibleFallen.map((l) => <LeafCard key={l.id} leaf={l} />)}</div>
+              </details>
+            )}
             {superseded.length > 0 && cat === "all" && (
               <details className="group">
                 <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.1em] text-sd-muted">Archived / superseded ({superseded.length})</summary>

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Search, Network, History, MessageSquare, Mail, LogOut, RotateCcw } from "lucide-react";
 import { useTransition } from "react";
 import { Avatar } from "./Avatar";
+import { TimeSlider } from "./TimeSlider";
 import { logout, resetDemo } from "@/lib/actions";
 
 const nav = [
@@ -36,7 +37,7 @@ export function Wordmark({ light = false }: { light?: boolean }) {
   );
 }
 
-export function Shell({ children, user }: { children: React.ReactNode; user: ShellUser | null }) {
+export function Shell({ children, user, simMonths = 0 }: { children: React.ReactNode; user: ShellUser | null; simMonths?: number }) {
   const path = usePathname();
   const [pending, start] = useTransition();
   if (!user || path.startsWith("/login")) return <main className="min-h-screen">{children}</main>;
@@ -56,7 +57,8 @@ export function Shell({ children, user }: { children: React.ReactNode; user: She
           {nav.map((n) => item(n))}
           <div className="mt-6 mb-1 px-3 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/40">Microsoft 365</div>
           {integrations.map((n) => item(n, "mock"))}
-          <button onClick={() => start(() => resetDemo())} className="mt-auto mb-2 flex items-center gap-2 rounded-[4px] px-3 py-2 text-[12px] text-white/40 hover:bg-white/5 hover:text-white/80"><RotateCcw className={`h-3.5 w-3.5 ${pending ? "animate-spin" : ""}`} /> Reset demo data</button>
+          <TimeSlider months={simMonths} key={simMonths} />
+          <button onClick={() => start(() => resetDemo())} className="mb-2 flex items-center gap-2 rounded-[4px] px-3 py-2 text-[12px] text-white/40 hover:bg-white/5 hover:text-white/80"><RotateCcw className={`h-3.5 w-3.5 ${pending ? "animate-spin" : ""}`} /> Reset demo data</button>
         </nav>
         <div className="flex items-center gap-2.5 border-t border-white/10 px-4 py-3">
           <Avatar id={user.id} size="sm" />
