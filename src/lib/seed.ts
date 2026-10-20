@@ -37,6 +37,8 @@ const nodes = [
   { id: "nk-de", companyId: "nike", parentId: "nk", name: "Germany", type: "country" as const, country: "DE", expertIds: ["jonas"], contacts: [{ name: "Katrin Vogel", role: "Head of Payroll Germany", email: "katrin.vogel@nike.com" }] },
   { id: "nk-de-gmbh", companyId: "nike", parentId: "nk-de", name: "Nike Deutschland GmbH", type: "entity" as const, country: "DE", expertIds: ["jonas"] },
   { id: "nk-de-retail", companyId: "nike", parentId: "nk-de", name: "Nike Retail Germany", type: "entity" as const, country: "DE", expertIds: [] },
+  // Scene 2b (second thought): Nike France, where Lena drafts a mail to Sarah. Sofie owns the branch.
+  { id: "nk-fr", companyId: "nike", parentId: "nk", name: "France", type: "country" as const, country: "FR", expertIds: ["sofie"], contacts: [{ name: "Sarah Laurent", role: "HR Manager France", email: "sarah@nike.fr" }, { name: "Julien Moreau", role: "Finance Controller France", email: "julien.moreau@nike.fr" }] },
   // Van der Valk
   { id: "vv", companyId: "vandervalk", parentId: null, name: "Van der Valk Hotels", type: "group" as const, expertIds: ["pieter"] },
   { id: "vv-nl", companyId: "vandervalk", parentId: "vv", name: "Netherlands", type: "country" as const, country: "NL", expertIds: ["pieter"] },
