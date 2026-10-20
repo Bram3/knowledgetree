@@ -1,9 +1,10 @@
 import { Redirect, signInAs, setRawCookie, signOut } from "@/test/next-mocks";
 import { beforeEach, describe, expect, it } from "vitest";
-import { addNote, addFile, uploadFile, uploadVersion, updateNote, claimItem, addVersion, archiveItem, addNode, nodeSummary, resetDemo, login } from "./actions";
+import { addNote, addFile, uploadFile, uploadVersion, updateNote, claimItem, addVersion, archiveItem, addNode, nodeSummary, resetDemo, login, askBot, suggestNode } from "./actions";
 import { AccessDeniedError } from "./access";
 import { getCurrentUser } from "./auth";
-import { resetDb } from "./db";
+import { getDb, resetDb } from "./db";
+import { ValidationError } from "./validation";
 
 // Seed facts: Amélie is assigned to Basic-Fit and ArcelorMittal, not Nike.
 // "nk" is the Nike EMEA root node, "bf-fr" is Basic-Fit France, "i-nk-escalation" is a Nike note.
@@ -92,6 +93,70 @@ describe("as Amélie, actions on her own customer still work", () => {
 
   it("adds a child node", async () => {
     await expect(addNode({ companyId: "basicfit", parentId: OWN_NODE, name: "Paris", type: "entity" })).resolves.toEqual(expect.any(String));
+  });
+});
+
+describe("malformed or oversized input is rejected before anything is stored", () => {
+  // Server actions are plain POST endpoints: the arguments are whatever the caller sends.
+  const OWN_NOTE = "i-bf-nl-cutoff";
+  const OWN_FILE = "i-bf-fr-bonus";
+  const long = (n: number) => "x".repeat(n);
+  const bad = (p: Promise<unknown>) => expect(p).rejects.toBeInstanceOf(ValidationError);
+  const versionForm = (fields: Record<string, string | File>) => {
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(fields)) fd.set(k, v);
+    return fd;
+  };
+
+  beforeEach(() => signInAs("amelie"));
+
+  it("addNote checks every field", async () => {
+    await bad(addNote({ ...note(OWN_NODE), content: long(20_001) }));
+    await bad(addNote({ ...note(OWN_NODE), title: long(201) }));
+    await bad(addNote({ ...note(OWN_NODE), title: 42 as unknown as string }));
+    await bad(addNote({ ...note(OWN_NODE), topic: long(201) }));
+    await bad(addNote({ ...note(OWN_NODE), origin: "admin" as "sdworx" }));
+    await bad(addNote({ ...note(OWN_NODE), scope: "all" as unknown as string[] }));
+    await bad(addNote({ ...note(OWN_NODE), scope: Array(51).fill("BE") }));
+    await bad(addNote({ ...note(OWN_NODE), source: { type: "system" as "portal", ref: "" } }));
+    await bad(addNote({ ...note(OWN_NODE), source: { type: "teams", ref: long(201) } }));
+    await bad(addNote(null as unknown as Parameters<typeof addNote>[0]));
+    expect(getDb().items.filter((i) => i.nodeId === OWN_NODE && i.kind === "note" && i.createdById === "amelie")).toEqual([]);
+  });
+
+  it("addFile checks its text fields", async () => {
+    const file = { nodeId: OWN_NODE, title: "t", fileName: "x.pdf", content: "", topic: "", scope: [] };
+    await bad(addFile({ ...file, fileName: long(201) }));
+    await bad(addFile({ ...file, content: long(20_001) }));
+    await bad(addFile({ ...file, fileUrl: 7 as unknown as string }));
+  });
+
+  it("updateNote, addVersion and uploadVersion bound the text", async () => {
+    await bad(updateNote(OWN_NOTE, long(20_001), "edit"));
+    await bad(updateNote(OWN_NOTE, "ok", long(201)));
+    await bad(updateNote(OWN_NOTE, { evil: true } as unknown as string, "edit"));
+    await bad(addVersion(OWN_FILE, long(201)));
+    await bad(uploadVersion(versionForm({ itemId: OWN_FILE, note: long(201) })));
+  });
+
+  it("a new file version only goes on a document, not on a note", async () => {
+    await bad(uploadVersion(versionForm({ itemId: OWN_NOTE, file: pdf() })));
+    expect(getDb().items.find((i) => i.id === OWN_NOTE)?.fileUrl).toBeUndefined();
+  });
+
+  it("addNode only creates the node types the form offers", async () => {
+    const child = { companyId: "basicfit", parentId: OWN_NODE, name: "Paris", type: "entity" as const };
+    await bad(addNode({ ...child, type: "group" as "entity" }));
+    await bad(addNode({ ...child, name: long(201) }));
+    await bad(addNode({ ...child, name: "  " }));
+    await bad(addNode({ ...child, country: "../../x" }));
+    await expect(addNode({ ...child, country: "FR" })).resolves.toEqual(expect.any(String));
+  });
+
+  it("the Teams bot and Outlook suggestion bound the text they search", async () => {
+    await bad(askBot(long(2_001)));
+    await bad(suggestNode(long(20_001)));
+    await bad(askBot(5 as unknown as string));
   });
 });
 
