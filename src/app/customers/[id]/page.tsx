@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChevronRight, Lock } from "lucide-react";
 import { requireUser, canAccess } from "@/lib/auth";
 import { company, companyNodes, companySummary, nodeStats, inheritedItems, itemsForNode, nodePath, node as getNode, nodeCountry, recentActivity, getDb, person, companyCategories } from "@/lib/db";
+import { leafCounts, leavesForNode, isLive } from "@/lib/leaves";
 import { OrgChart } from "@/components/OrgChart";
 import { NodePanel, type PanelData } from "@/components/NodePanel";
 import { AddNodeButton } from "@/components/AddNodeButton";
@@ -34,6 +35,7 @@ export default async function CustomerPage({ params, searchParams }: PageProps<"
   const categories = companyCategories(id);
   const selectedCat = sp.cat && categories.some((c) => c.id === sp.cat) ? sp.cat : undefined;
   const db = getDb();
+  const leaves = leafCounts(id);
   const customerDocsByCategory = Object.fromEntries(nodes.map((n) => [n.id, Object.fromEntries(categories.map((c) => [c.id, itemsForNode(n.id).filter((i) => i.status === "active" && i.category === c.id && i.origin === "customer").length]))]));
 
   const panel: PanelData = {
@@ -48,6 +50,7 @@ export default async function CustomerPage({ params, searchParams }: PageProps<"
     highlightItem: sp.item,
     currentUserId: user.id,
     initialCategory: selectedCat,
+    leaves: leavesForNode(selectedId).filter(isLive),
   };
 
   return (
@@ -67,7 +70,7 @@ export default async function CustomerPage({ params, searchParams }: PageProps<"
       </header>
       <div className="grid min-h-0 flex-1 grid-cols-[1fr_440px] gap-4">
         <div className="card relative min-h-0 overflow-hidden">
-          <OrgChart companyId={id} nodes={nodes} stats={stats} categories={categories} selectedId={selectedId} selectedCat={selectedCat} customerDocsByCategory={customerDocsByCategory} />
+          <OrgChart companyId={id} nodes={nodes} stats={stats} categories={categories} selectedId={selectedId} selectedCat={selectedCat} customerDocsByCategory={customerDocsByCategory} leafCounts={leaves} />
         </div>
         <NodePanel data={panel} key={`${selectedId}:${selectedCat ?? "all"}`} />
       </div>

@@ -90,10 +90,53 @@ export type Activity = {
   summary: string;
 };
 
+// ---------- leaves ----------
+
+export type LeafType = "attention" | "change" | "decision" | "promise" | "expertise" | "risk";
+export const LEAF_TYPES: readonly LeafType[] = ["attention", "change", "decision", "promise", "expertise", "risk"];
+
+/** Where a leaf was captured. One ingest entry point serves all of them. */
+export type Channel = "call" | "mail" | "browser" | "teams" | "voice";
+/** auto = passive capture (0 clicks), reaction = a 🍃 from the user, voice = a spoken note. */
+export type Trigger = "auto" | "reaction" | "voice";
+
+/** seed = placement unsure, waits at the customer root. auto = placed by the pipeline. */
+export type LeafStatus = "seed" | "auto" | "verified" | "conflict" | "fallen" | "promoted";
+
+export type LeafSource = {
+  channel: Channel;
+  trigger: Trigger;
+  ref: string; // channel-specific id of the message/call, e.g. "outlook:e1"
+  at: string; // ISO time of capture
+  byId: string; // person who captured it (the signed-in user)
+  from?: string; // who said it, e.g. "Katrin Vogel <katrin.vogel@nike.com>"
+};
+
+/** An atomic piece of working knowledge caught from daily communication, hung on a node › category. */
+export type Leaf = {
+  id: string;
+  nodeId: string; // for a seed: the customer's root node
+  category: string; // product id from the catalog, or "other"
+  type: LeafType;
+  statement: string;
+  why?: string;
+  quote: string; // literal quote from the source text
+  people: string[];
+  source: LeafSource;
+  confidence: number; // 0..1
+  status: LeafStatus;
+  reconfirmedAt: string[]; // ×n label = length + 1
+  usefulCount: number;
+  conflictsWith?: string;
+  promotedToItemId?: string;
+  verifiedById?: string;
+};
+
 export type Db = {
   people: Person[];
   companies: Company[];
   nodes: OrgNode[];
   items: Item[];
   activity: Activity[];
+  leaves: Leaf[];
 };

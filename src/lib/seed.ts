@@ -165,4 +165,4 @@ const activity = [
   { id: "a15", at: d(70, 10), actorId: "tom", action: "new_version" as const, companyId: "arcelormittal", nodeId: "am-be-gent", itemId: "i-am-gent-shift", summary: "uploaded version 2 of Shift premium table Gent" },
 ];
 
-export const seed: Db = { people, companies, nodes, items, activity };
+export const seed: Db = { people, companies, nodes, items, activity, leaves: [] };

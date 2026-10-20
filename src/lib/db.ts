@@ -19,8 +19,10 @@ function load(): Db {
   if (globalThis.__ktdb) return globalThis.__ktdb;
   try {
     if (fs.existsSync(FILE)) {
-      globalThis.__ktdb = JSON.parse(fs.readFileSync(FILE, "utf8")) as Db;
-      return globalThis.__ktdb;
+      const db = JSON.parse(fs.readFileSync(FILE, "utf8")) as Db;
+      db.leaves ??= []; // db.json written before leaves existed
+      globalThis.__ktdb = db;
+      return db;
     }
   } catch {}
   globalThis.__ktdb = structuredClone(seed);
