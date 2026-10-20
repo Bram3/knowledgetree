@@ -66,6 +66,7 @@ export function LeafCard({ leaf }: { leaf: Leaf | FreshLeaf }) {
         <span>· {fmtDate(leaf.source.at)}</span>
         {leaf.source.from && <span>· said by {leaf.source.from.replace(/\s*<.*>$/, "")}</span>}
         <span>· caught for {personName(leaf.source.byId)}</span>
+        {leaf.ownerId && leaf.ownerId !== leaf.source.byId && <span>· owner {personName(leaf.ownerId)}</span>}
       </div>
       {fresh && s && (
         <div className="mt-2 flex items-center gap-2">

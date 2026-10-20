@@ -6,12 +6,18 @@ import { addLeaves, getLeaf } from "./leaves";
 import { AccessDeniedError } from "./access";
 
 const p = (id: string) => person(id)!;
+const NOW = new Date("2026-10-20T10:00:00Z"); // demo day
 
 beforeEach(() => resetDb());
 
 describe("knowledge risk", () => {
   it("Nike: 62% of what we know about Germany comes from Jonas", () => {
-    expect(customerRisk("nike")).toMatchObject({ nodeId: "nk-de", nodeName: "Germany", personId: "jonas", percent: 62 });
+    expect(customerRisk("nike", NOW)).toMatchObject({ nodeId: "nk-de", nodeName: "Germany", personId: "jonas", percent: 62 });
+  });
+
+  it("only current knowledge counts: a fallen leaf from Jonas doesn't raise it", () => {
+    addLeaves([{ ...getLeaf("sl-jb-1")!, id: "old-promise", type: "promise", source: { ...getLeaf("sl-jb-1")!.source, at: "2026-01-01T10:00:00Z" } }]);
+    expect(customerRisk("nike", NOW)?.percent).toBe(62);
   });
 });
 
@@ -94,10 +100,10 @@ describe("handover brief", () => {
 
   it("opens with key facts, attention points and people to call, each with its source", () => {
     const h = handToLena();
-    const b = handoverBrief(p("lena"), h.id);
+    const b = handoverBrief(p("lena"), h.id, NOW);
     expect(b).toMatchObject({ companyName: "Nike EMEA", fromName: "Jonas Becker", toName: "Lena Vermeulen" });
     expect(b.facts.map((f) => f.text)).toContain("Payroll cutoff Germany moves to the 18th");
-    expect(b.facts.map((f) => f.text)).toContain("SDWorx promised a dry run of the October payroll on the new time registration export.");
+    expect(b.facts.map((f) => f.text)).toContain("Agreed: SDWorx does a dry run of the October payroll on the new time registration export.");
     expect(b.attention.map((f) => f.text)).toContain("The works council (Betriebsrat) must approve every change to shift patterns before payroll applies it.");
     expect(b.people.map((f) => f.text)).toEqual(expect.arrayContaining([expect.stringContaining("Katrin Vogel"), expect.stringContaining("Jonas Becker")]));
     const all = [...b.facts, ...b.conflicts, ...b.attention, ...b.people];
@@ -105,13 +111,13 @@ describe("handover brief", () => {
       expect(point.source.label).toBeTruthy();
       expect(point.source.href).toMatch(/^\/customers\/nike/);
     }
-    const dryRun = b.facts.find((f) => f.text.startsWith("SDWorx promised a dry run"))!;
+    const dryRun = b.facts.find((f) => f.text.startsWith("Agreed: SDWorx does a dry run"))!;
     expect(dryRun.source.quote).toBe("we do a dry run on the new export before the October payroll");
   });
 
   it("lists open conflicts on the handed-over knowledge", () => {
     addLeaves([{ ...getLeaf("sl-jb-10")!, id: "x-conflict", statement: "Payslips stay German only.", quote: "payslips stay in German", status: "conflict", conflictsWith: "sl-jb-10" }]);
-    const b = handoverBrief(p("lena"), handToLena().id);
+    const b = handoverBrief(p("lena"), handToLena().id, NOW);
     expect(b.conflicts).toHaveLength(1);
     expect(b.conflicts[0].text).toContain("Payslips stay German only.");
     expect(b.conflicts[0].text).toContain("Nike Germany wants the payslip PDFs in German and English from 2027.");
@@ -119,7 +125,7 @@ describe("handover brief", () => {
 
   it("only people on the customer can open it", () => {
     const h = handToLena();
-    expect(() => handoverBrief(p("amelie"), h.id)).toThrow(AccessDeniedError);
-    expect(() => handoverBrief(p("lena"), "h-unknown")).toThrow(AccessDeniedError);
+    expect(() => handoverBrief(p("amelie"), h.id, NOW)).toThrow(AccessDeniedError);
+    expect(() => handoverBrief(p("lena"), "h-unknown", NOW)).toThrow(AccessDeniedError);
   });
 });

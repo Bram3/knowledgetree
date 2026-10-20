@@ -32,14 +32,16 @@ describe("🍃 reaction in Teams", () => {
   });
 
   it("reacting twice to the same message does not grow a second leaf", async () => {
+    const before = leavesForCompany("nike").length;
     const first = await ingestText(teamsReactionInput(msg("m3")));
     const again = await ingestText(teamsReactionInput(msg("m3")));
     expect(again.leaves.map((l) => l.id)).toEqual(first.leaves.map((l) => l.id));
-    expect(leavesForCompany("nike")).toHaveLength(first.leaves.length);
+    expect(leavesForCompany("nike")).toHaveLength(before + first.leaves.length);
   });
 
   it("reacting to the handover greeting keeps nothing", async () => {
+    const before = leavesForCompany("nike");
     expect((await ingestText(teamsReactionInput(msg("m1")))).leaves).toEqual([]);
-    expect(leavesForCompany("nike")).toEqual([]);
+    expect(leavesForCompany("nike")).toEqual(before);
   });
 });

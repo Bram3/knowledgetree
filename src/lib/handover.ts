@@ -1,5 +1,6 @@
 import { companyNodes, getDb, node, person, saveDb, uid } from "./db";
 import { isLive } from "./leaves";
+import { isCurrent } from "./freshness";
 import { AccessDeniedError, assertCompanyAccess } from "./access";
 import type { Handover, Leaf, OrgNode, Person } from "./types";
 
@@ -22,11 +23,11 @@ function subtree(nodeId: string): Set<string> {
   return out;
 }
 
-/** Who each piece of knowledge on these nodes comes from: live leaves (who caught it) and active notes (who wrote it). */
-function contributors(nodeIds: Set<string>): string[] {
+/** Who each piece of knowledge on these nodes comes from: current leaves (who caught it) and active notes (who wrote it). */
+function contributors(nodeIds: Set<string>, now: Date): string[] {
   const db = getDb();
   return [
-    ...db.leaves.filter((l) => nodeIds.has(l.nodeId) && isLive(l)).map((l) => l.source.byId),
+    ...db.leaves.filter((l) => nodeIds.has(l.nodeId) && isCurrent(l, now)).map((l) => l.source.byId),
     ...db.items.filter((i) => nodeIds.has(i.nodeId) && i.kind === "note" && i.status === "active").map((i) => i.createdById),
   ];
 }
@@ -40,10 +41,10 @@ export type KnowledgeRisk = {
   percent: number; // rounded share, 0..100
 };
 
-/** Share of the leaves and notes on `nodeId` (and below) that come from its biggest contributor. */
-export function knowledgeRisk(nodeId: string): KnowledgeRisk | null {
+/** Share of the current leaves and notes on `nodeId` (and below) from its biggest contributor. Faded leaves don't count. */
+export function knowledgeRisk(nodeId: string, now: Date): KnowledgeRisk | null {
   const n = node(nodeId);
-  const from = contributors(subtree(nodeId));
+  const from = contributors(subtree(nodeId), now);
   if (!n || !from.length) return null;
   const counts = new Map<string, number>();
   for (const id of from) counts.set(id, (counts.get(id) ?? 0) + 1);
@@ -55,12 +56,12 @@ export function knowledgeRisk(nodeId: string): KnowledgeRisk | null {
  * The branch of a customer that leans most on one person, for the customer card.
  * Branches are the root's children (countries); ranked by how much knowledge hangs on that one person.
  */
-export function customerRisk(companyId: string): KnowledgeRisk | null {
+export function customerRisk(companyId: string, now: Date): KnowledgeRisk | null {
   const nodes = companyNodes(companyId);
   const root = nodes.find((n) => !n.parentId);
   if (!root) return null;
   const branches: OrgNode[] = nodes.filter((n) => n.parentId === root.id);
-  const risks = (branches.length ? branches : [root]).map((b) => knowledgeRisk(b.id)).filter((r): r is KnowledgeRisk => !!r);
+  const risks = (branches.length ? branches : [root]).map((b) => knowledgeRisk(b.id, now)).filter((r): r is KnowledgeRisk => !!r);
   return risks.sort((a, b) => b.count - a.count || b.percent - a.percent)[0] ?? null;
 }
 
@@ -220,13 +221,13 @@ function leafSource(l: Leaf, companyId: string): BriefSource {
  * The brief the new owner gets for one customer, built from what was handed over. Computed on read, so it
  * follows later changes. Every point carries its source (a quote, a note version or the org chart).
  */
-export function handoverBrief(user: Person, handoverId: string): HandoverBrief {
+export function handoverBrief(user: Person, handoverId: string, now: Date): HandoverBrief {
   const h = getHandover(handoverId);
   if (!h) throw new AccessDeniedError();
   const c = assertCompanyAccess(user, h.companyId);
   const db = getDb();
   const leafIds = new Set(h.leafIds);
-  const leaves = db.leaves.filter((l) => leafIds.has(l.id) && isLive(l));
+  const leaves = db.leaves.filter((l) => leafIds.has(l.id) && isCurrent(l, now)); // faded leaves aren't current facts
   const items = db.items.filter((i) => h.itemIds.includes(i.id) && i.status === "active");
   const base = `/customers/${c.id}`;
 

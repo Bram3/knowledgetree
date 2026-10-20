@@ -9,6 +9,7 @@ import { now } from "@/lib/clock";
 import { OrgChart } from "@/components/OrgChart";
 import { NodePanel, type PanelData } from "@/components/NodePanel";
 import { AddNodeButton } from "@/components/AddNodeButton";
+import { HerfstBar } from "@/components/HerfstBar";
 import { CompanyLogo } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -72,6 +73,7 @@ export default async function CustomerPage({ params, searchParams }: PageProps<"
         </div>
         <AddNodeButton companyId={id} nodes={nodes.map((n) => ({ id: n.id, name: n.name, type: n.type }))} />
       </header>
+      <HerfstBar companyId={id} now={at} />
       <div className="grid min-h-0 flex-1 grid-cols-[1fr_440px] gap-4">
         <div className="card relative min-h-0 overflow-hidden">
           <OrgChart companyId={id} nodes={nodes} stats={stats} categories={categories} selectedId={selectedId} selectedCat={selectedCat} customerDocsByCategory={customerDocsByCategory} leafCounts={leaves} />
